@@ -1,21 +1,23 @@
 export type UserRole = 'member' | 'admin'
 
-export interface Profile {
+export type Profile = {
   id: string
   full_name: string
   email: string
+  phone: string
+  fellowship_unit: string
   role: UserRole
   created_at: string
 }
 
-export interface ChallengeSettings {
+export type ChallengeSettings = {
   id: 1
   start_date: string | null
   timezone: string
   updated_at: string
 }
 
-export interface ChallengeDay {
+export type ChallengeDay = {
   id: string
   day_number: number
   title: string
@@ -24,55 +26,218 @@ export interface ChallengeDay {
   updated_at: string
 }
 
-export interface Activity {
+export type Activity = {
   id: string
   challenge_day_id: string
   description: string
   sort_order: number
 }
 
-export interface Completion {
+export type Completion = {
   id: string
   user_id: string
   challenge_day_id: string
   completed_at: string
 }
 
-// Supabase DB type map (for typed clients)
-export interface Database {
+export type ActivityCompletion = {
+  id: string
+  user_id: string
+  activity_id: string
+  completed_at: string
+}
+
+export type MemberStats = {
+  current_streak: number
+  longest_run: number
+  total_completed: number
+}
+
+export type ChallengeDayWithActivities = ChallengeDay & {
+  activities: Activity[]
+}
+
+// ─────────────────────────────────────────
+// Supabase Database type map
+// Note: Types (not interfaces) are used so TypeScript
+// treats Row, Insert, and Update as assignable to Record<string, unknown>.
+// ─────────────────────────────────────────
+export type Database = {
   public: {
     Tables: {
       profiles: {
         Row: Profile
-        Insert: Omit<Profile, 'created_at'>
-        Update: Partial<Omit<Profile, 'id' | 'created_at'>>
+        Insert: {
+          id: string
+          full_name?: string
+          email?: string
+          phone?: string
+          fellowship_unit?: string
+          role?: UserRole
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          email?: string
+          phone?: string
+          fellowship_unit?: string
+          role?: UserRole
+          created_at?: string
+        }
+        Relationships: []
       }
       challenge_settings: {
         Row: ChallengeSettings
-        Insert: Omit<ChallengeSettings, 'id' | 'updated_at'>
-        Update: Partial<Omit<ChallengeSettings, 'id' | 'updated_at'>>
+        Insert: {
+          id?: 1
+          start_date?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: 1
+          start_date?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       challenge_days: {
         Row: ChallengeDay
-        Insert: Omit<ChallengeDay, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<ChallengeDay, 'id' | 'created_at' | 'updated_at'>>
+        Insert: {
+          id?: string
+          day_number: number
+          title?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          day_number?: number
+          title?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       activities: {
         Row: Activity
-        Insert: Omit<Activity, 'id'>
-        Update: Partial<Omit<Activity, 'id'>>
+        Insert: {
+          id?: string
+          challenge_day_id: string
+          description?: string
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          challenge_day_id?: string
+          description?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'activities_challenge_day_id_fkey'
+            columns: ['challenge_day_id']
+            isOneToOne: false
+            referencedRelation: 'challenge_days'
+            referencedColumns: ['id']
+          }
+        ]
       }
       completions: {
         Row: Completion
-        Insert: Omit<Completion, 'id' | 'completed_at'>
-        Update: Partial<Omit<Completion, 'id' | 'completed_at'>>
+        Insert: {
+          id?: string
+          user_id: string
+          challenge_day_id: string
+          completed_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          challenge_day_id?: string
+          completed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'completions_challenge_day_id_fkey'
+            columns: ['challenge_day_id']
+            isOneToOne: false
+            referencedRelation: 'challenge_days'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'completions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      activity_completions: {
+        Row: ActivityCompletion
+        Insert: {
+          id?: string
+          user_id: string
+          activity_id: string
+          completed_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          activity_id?: string
+          completed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'activity_completions_activity_id_fkey'
+            columns: ['activity_id']
+            isOneToOne: false
+            referencedRelation: 'activities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'activity_completions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
+    Views: Record<string, never>
     Functions: {
-      is_admin: {
-        Args: Record<string, never>
-        Returns: boolean
+      is_admin: { Args: Record<string, never>; Returns: boolean }
+      get_current_challenge_day: { Args: Record<string, never>; Returns: number }
+      get_member_streak: { Args: { member_id: string }; Returns: number }
+      get_member_stats: {
+        Args: { member_id: string }
+        Returns: MemberStats[]
       }
     }
   }
 }
+
+// ─────────────────────────────────────────
+// Fellowship unit list (matches church units)
+// ─────────────────────────────────────────
+export const FELLOWSHIP_UNITS = [
+  'General Assembly',
+  'Media & Tech Ministry',
+  'Choir / Music Ministry',
+  'Ushering & Protocol',
+  'Youth Department',
+  "Children's Church",
+  "Women's Fellowship",
+  "Men's Fellowship",
+  'Prayer & Intercession Unit',
+  'Evangelism & Outreach',
+  'Finance & Administration',
+  'Campus Ministry (OAU/Poly)',
+  'Guest Services',
+] as const
