@@ -22,6 +22,7 @@ export type ChallengeDay = {
   day_number: number
   title: string
   description: string | null
+  scripture_reference?: string
   created_at: string
   updated_at: string
 }
@@ -53,14 +54,27 @@ export type MemberStats = {
   total_completed: number
 }
 
+export type LeaderboardEntry = {
+  rank: number
+  id: string
+  full_name: string
+  fellowship_unit: string
+  current_streak: number
+  total_completed: number
+  last_completed_at: string | null
+}
+
+export type DayCompletionCount = {
+  day_number: number
+  completion_count: number
+}
+
 export type ChallengeDayWithActivities = ChallengeDay & {
   activities: Activity[]
 }
 
 // ─────────────────────────────────────────
 // Supabase Database type map
-// Note: Types (not interfaces) are used so TypeScript
-// treats Row, Insert, and Update as assignable to Record<string, unknown>.
 // ─────────────────────────────────────────
 export type Database = {
   public: {
@@ -110,6 +124,7 @@ export type Database = {
           day_number: number
           title?: string
           description?: string | null
+          scripture_reference?: string
           created_at?: string
           updated_at?: string
         }
@@ -118,6 +133,7 @@ export type Database = {
           day_number?: number
           title?: string
           description?: string | null
+          scripture_reference?: string
           created_at?: string
           updated_at?: string
         }
@@ -218,6 +234,18 @@ export type Database = {
       get_member_stats: {
         Args: { member_id: string }
         Returns: MemberStats[]
+      }
+      get_leaderboard: {
+        Args: { limit_count?: number }
+        Returns: LeaderboardEntry[]
+      }
+      get_day_completion_counts: {
+        Args: Record<string, never>
+        Returns: DayCompletionCount[]
+      }
+      seed_default_40_days: {
+        Args: Record<string, never>
+        Returns: void
       }
     }
   }
