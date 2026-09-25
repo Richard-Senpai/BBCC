@@ -7,6 +7,7 @@ export type Profile = {
   phone: string
   fellowship_unit: string
   role: UserRole
+  avatar_url?: string | null
   created_at: string
 }
 
@@ -59,6 +60,7 @@ export type LeaderboardEntry = {
   id: string
   full_name: string
   fellowship_unit: string
+  avatar_url?: string | null
   current_streak: number
   total_completed: number
   last_completed_at: string | null
@@ -71,6 +73,23 @@ export type DayCompletionCount = {
 
 export type ChallengeDayWithActivities = ChallengeDay & {
   activities: Activity[]
+}
+
+export type Message = {
+  id: string
+  user_id: string | null
+  content: string
+  created_at: string
+}
+
+export type MessageWithSender = Message & {
+  profiles: {
+    id: string
+    full_name: string
+    avatar_url?: string | null
+    fellowship_unit: string
+    role: UserRole
+  } | null
 }
 
 // ─────────────────────────────────────────
@@ -88,6 +107,7 @@ export type Database = {
           phone?: string
           fellowship_unit?: string
           role?: UserRole
+          avatar_url?: string | null
           created_at?: string
         }
         Update: {
@@ -97,6 +117,7 @@ export type Database = {
           phone?: string
           fellowship_unit?: string
           role?: UserRole
+          avatar_url?: string | null
           created_at?: string
         }
         Relationships: []
@@ -218,6 +239,30 @@ export type Database = {
           },
           {
             foreignKeyName: 'activity_completions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      messages: {
+        Row: Message
+        Insert: {
+          id?: string
+          user_id?: string | null
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          content?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'messages_user_id_fkey'
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
