@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
+import UserAvatar from '@/components/UserAvatar'
+import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import ActivityChecklist from '@/components/dashboard/ActivityChecklist'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
@@ -60,15 +62,15 @@ function NotStartedView({
   return (
     <div className="px-4 py-12 text-center">
       <div className="text-6xl mb-4">⏳</div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-2">
         Challenge not started yet
       </h1>
-      <p className="text-gray-500 text-sm mb-1">
+      <p className="text-gray-500 dark:text-zinc-400 text-sm mb-1">
         Welcome, {firstName}! The 40-Day Consecration will begin once your
         pastor sets the start date.
       </p>
       {settings?.start_date && (
-        <p className="text-amber-700 font-semibold text-sm mt-3">
+        <p className="text-amber-700 dark:text-amber-400 font-semibold text-sm mt-3">
           Starting:{' '}
           {new Date(settings.start_date).toLocaleDateString('en-NG', {
             weekday: 'long',
@@ -87,10 +89,10 @@ function CompletedView({ profile }: { profile: Profile }) {
   return (
     <div className="px-4 py-12 text-center">
       <div className="text-6xl mb-4">🏆</div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-2">
         Glory to God, {firstName}!
       </h1>
-      <p className="text-gray-600 text-sm">
+      <p className="text-gray-600 dark:text-zinc-400 text-sm">
         You have completed the 40-Day Consecration Challenge. Your certificate
         of consecration will be issued soon.
       </p>
@@ -201,42 +203,51 @@ export default async function DashboardPage() {
       {/* ── Header ─────────────────────────────────────────── */}
       <DashboardHeader profile={profile} streak={stats.current_streak} />
 
-      {/* ── Greeting ────────────────────────────────────────── */}
+      {/* ── Greeting with Avatar ────────────────────────────── */}
       <section className="px-4 mt-3">
-        {profile.fellowship_unit && (
-          <p className="text-xs font-semibold text-green-700 flex items-center gap-1 mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-            {profile.fellowship_unit.toUpperCase()}
-          </p>
-        )}
-        <h1 className="text-2xl font-black text-gray-950 leading-tight">
-          {greeting}, {firstName}{' '}
-          <span aria-hidden="true">
-            {greeting.startsWith('Good m') ? '☀️' : greeting.startsWith('Good a') ? '🌤️' : '🌙'}
-          </span>
-        </h1>
+        <div className="flex items-center gap-3">
+          <UserAvatar
+            avatarUrl={profile.avatar_url}
+            name={profile.full_name}
+            size="lg"
+          />
+          <div className="min-w-0 flex-1">
+            {profile.fellowship_unit && (
+              <p className="text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-1 mb-0.5 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                {profile.fellowship_unit.toUpperCase()}
+              </p>
+            )}
+            <h1 className="text-xl font-black text-gray-950 dark:text-zinc-50 leading-tight truncate">
+              {greeting}, {firstName}{' '}
+              <span aria-hidden="true">
+                {greeting.startsWith('Good m') ? '☀️' : greeting.startsWith('Good a') ? '🌤️' : '🌙'}
+              </span>
+            </h1>
+          </div>
+        </div>
       </section>
 
       {/* ── Progress bar ────────────────────────────────────── */}
-      <section className="px-4 mt-3">
+      <section className="px-4 mt-3.5">
         <div className="flex items-center justify-between text-sm font-semibold mb-1.5">
-          <span className="text-gray-800">
-            Day <span className="text-amber-600">{currentDay}</span> of 40
+          <span className="text-gray-800 dark:text-zinc-200">
+            Day <span className="text-amber-600 dark:text-amber-400">{currentDay}</span> of 40
           </span>
-          <span className="text-amber-600">{pct}% Completed</span>
+          <span className="text-amber-600 dark:text-amber-400">{pct}% Completed</span>
         </div>
-        <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+        <div className="h-2 rounded-full bg-gray-200 dark:bg-zinc-800 overflow-hidden">
           <div
             className="h-full rounded-full bg-amber-500 transition-all duration-700"
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1 flex-wrap">
+        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5 flex items-center gap-1 flex-wrap">
           <span>{stats.total_completed} of 40 days completed</span>
           {nextMilestone && (
             <>
               <span>·</span>
-              <span className="text-amber-600 font-medium">
+              <span className="text-amber-600 dark:text-amber-400 font-medium">
                 ⚡ Milestone: Day {nextMilestone.day} in{' '}
                 {nextMilestone.daysLeft}{' '}
                 {nextMilestone.daysLeft === 1 ? 'day' : 'days'}
@@ -248,40 +259,44 @@ export default async function DashboardPage() {
 
       {/* ── Today's Devotion card ────────────────────────────── */}
       <section className="px-4 mt-4">
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 overflow-hidden transition-colors">
           {/* Card header */}
-          <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+          <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-zinc-800">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
+                <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest">
                   Today&apos;s Devotion
                 </span>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
                   {dayOfWeek} Consecration
                 </p>
               </div>
-              <div className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+              <div className="text-xs text-gray-500 dark:text-zinc-400 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full font-medium">
                 Day {currentDay}
               </div>
             </div>
 
             {todayChallenge ? (
               <>
-                <h2 className="text-base font-bold text-gray-900 mt-2 leading-snug">
+                <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100 mt-2 leading-snug">
                   {todayChallenge.title}
                 </h2>
+                {todayChallenge.scripture_reference && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1 flex items-center gap-1">
+                    <span>📖</span> {todayChallenge.scripture_reference}
+                  </p>
+                )}
                 {todayChallenge.description && (
-                  <div className="mt-2 bg-amber-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-700 leading-relaxed italic">
+                  <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-xl p-3">
+                    <p className="text-xs text-gray-700 dark:text-zinc-300 leading-relaxed italic">
                       &ldquo;{todayChallenge.description}&rdquo;
                     </p>
                   </div>
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-400 italic mt-2">
-                Content for Day {currentDay} is being prepared — check back
-                soon.
+              <p className="text-sm text-gray-400 dark:text-zinc-500 italic mt-2">
+                Content for Day {currentDay} is being prepared — check back soon.
               </p>
             )}
           </div>
@@ -299,7 +314,7 @@ export default async function DashboardPage() {
                 isToday={true}
               />
             ) : (
-              <p className="text-sm text-gray-400 text-center py-4">
+              <p className="text-sm text-gray-400 dark:text-zinc-500 text-center py-4">
                 Activities for Day {currentDay} will appear here.
               </p>
             )}
@@ -316,21 +331,21 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* ── Prayer Chain banner (placeholder) ───────────────── */}
+      {/* ── Prayer Chain banner ─────────────────────────────── */}
       <section className="px-4 mt-4">
-        <div className="bg-amber-900 rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-amber-950 dark:bg-zinc-900 border border-amber-900 dark:border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-amber-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-amber-800 dark:bg-amber-950 flex items-center justify-center">
               <span className="text-sm">🙏</span>
             </div>
             <div>
               <p className="text-xs font-bold text-white">Prayer Chain Active</p>
-              <p className="text-[10px] text-amber-300">
+              <p className="text-[10px] text-amber-300 dark:text-amber-400">
                 Believers praying in unity now
               </p>
             </div>
           </div>
-          <button className="text-xs font-bold text-amber-400 bg-amber-800 px-3 py-1.5 rounded-lg">
+          <button className="text-xs font-bold text-amber-400 bg-amber-900/80 dark:bg-zinc-800 px-3 py-1.5 rounded-lg border border-amber-700/50 dark:border-zinc-700">
             Join · Watch
           </button>
         </div>
@@ -355,18 +370,19 @@ function DashboardHeader({
       <div className="flex items-center gap-2">
         <BBCCLogo size="sm" />
         <div className="leading-tight">
-          <p className="text-xs font-black text-gray-900">BBCC 40-Day</p>
-          <p className="text-[10px] text-gray-500">Believers&apos; Banquet</p>
+          <p className="text-xs font-black text-gray-900 dark:text-zinc-100">BBCC 40-Day</p>
+          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Believers&apos; Banquet</p>
         </div>
       </div>
 
-      {/* Right: streak pill + sign-out */}
+      {/* Right: streak pill + theme toggle + sign-out */}
       <div className="flex items-center gap-2">
         {streak > 0 && (
-          <div className="flex items-center gap-1 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm shadow-amber-200">
+          <div className="flex items-center gap-1 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm shadow-amber-500/20">
             🔥 {streak} {streak === 1 ? 'Day' : 'Days'}
           </div>
         )}
+        <ThemeToggle />
         <LogoutButton />
       </div>
     </header>

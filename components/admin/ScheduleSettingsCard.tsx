@@ -48,16 +48,16 @@ export default function ScheduleSettingsCard({
   }
 
   return (
-    <section className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200">
+    <section className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-200 dark:border-zinc-800 transition-colors">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 dark:border-zinc-800 gap-2">
         <div className="flex items-center gap-2">
           <span className="text-xl">⚙️</span>
           <div>
-            <h2 className="text-base font-black text-gray-900">
+            <h2 className="text-base font-black text-gray-900 dark:text-zinc-100">
               Challenge Schedule &amp; Temporal Synchronization
             </h2>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
               Define master synchronization clocks for the BBCC assembly in Ile-Ife.
             </p>
           </div>
@@ -74,18 +74,18 @@ export default function ScheduleSettingsCard({
               {isSeeding ? 'Initializing…' : '⚡ Initialize 40 Days'}
             </button>
           )}
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg">
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">
             🔒 Pastoral Key Locked
           </span>
         </div>
       </div>
 
       {/* Critical Temporal Modification Warning */}
-      <div className="mt-4 bg-amber-50 border border-amber-200/80 rounded-xl p-3.5 flex items-start gap-3">
-        <span className="text-amber-600 text-lg flex-shrink-0 mt-0.5">⚠️</span>
-        <div className="text-xs text-amber-900 leading-relaxed">
+      <div className="mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-xl p-3.5 flex items-start gap-3">
+        <span className="text-amber-600 dark:text-amber-400 text-lg flex-shrink-0 mt-0.5">⚠️</span>
+        <div className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
           <p className="font-bold">Critical Temporal Modification Warning</p>
-          <p className="mt-0.5 text-amber-800">
+          <p className="mt-0.5 text-amber-800 dark:text-amber-300/90 font-medium">
             Changing the start date or timezone while the 40-day challenge is actively
             running will shift the current day index for all members and will adjust
             universal streak calculations.
@@ -98,29 +98,29 @@ export default function ScheduleSettingsCard({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Start Date */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
+            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
               Challenge Start Date
             </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-semibold bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
             />
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
               Determines Day 1 universal activation
             </p>
           </div>
 
           {/* Timezone */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
+            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
               Fellowship Timezone
             </label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-semibold bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm cursor-pointer"
             >
               <option value="Africa/Lagos">
                 West Africa Time (WAT) - GMT+1 (Ile-Ife Local)
@@ -129,23 +129,23 @@ export default function ScheduleSettingsCard({
               <option value="Europe/London">London (GMT/BST)</option>
               <option value="America/New_York">New York (EST/EDT)</option>
             </select>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
               Synced to BBCC Ile-Ife Tabernacle
             </p>
           </div>
 
           {/* Reset Time (Display only per design) */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
+            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
               Daily Devotional Reset Time
             </label>
             <input
               type="text"
               readOnly
               value="00:00 WAT (Midnight)"
-              className="w-full px-3 py-2 text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-300 rounded-xl cursor-not-allowed"
+              className="w-full px-3.5 py-2 text-xs font-bold bg-gray-100 dark:bg-zinc-800/60 text-gray-600 dark:text-zinc-400 border border-gray-300 dark:border-zinc-700 rounded-xl cursor-not-allowed shadow-sm"
             />
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
               Members refresh progress at this hour
             </p>
           </div>
@@ -155,8 +155,8 @@ export default function ScheduleSettingsCard({
           <div
             className={`text-xs px-3 py-2 rounded-xl font-medium ${
               msg.type === 'success'
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-red-50 text-red-700 border border-red-200'
+                ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
             }`}
           >
             {msg.text}
@@ -166,14 +166,14 @@ export default function ScheduleSettingsCard({
         <div className="flex items-center justify-between pt-2">
           <button
             type="button"
-            className="text-xs text-gray-500 hover:text-gray-800 font-medium"
+            className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200 font-medium"
           >
             📋 Audit Log (12 Changes)
           </button>
           <button
             type="submit"
             disabled={isPending}
-            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
+            className="px-4 py-2 bg-gray-950 dark:bg-zinc-800 hover:bg-gray-800 dark:hover:bg-zinc-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
           >
             {isPending ? 'Saving…' : 'Save Schedule Settings'}
           </button>

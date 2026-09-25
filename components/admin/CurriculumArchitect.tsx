@@ -156,16 +156,16 @@ export default function CurriculumArchitect({
   ).length
 
   return (
-    <section className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 mt-6">
+    <section className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-200 dark:border-zinc-800 mt-6 transition-colors">
       {/* Title & Legend */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 dark:border-zinc-800 gap-2">
         <div className="flex items-center gap-2">
           <span className="text-xl">🏛️</span>
           <div>
-            <h2 className="text-base font-black text-gray-900">
+            <h2 className="text-base font-black text-gray-900 dark:text-zinc-100">
               40-Day Curriculum Matrix &amp; Content Architect
             </h2>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
               Tap any day node to inspect details or preview publishing readiness.
             </p>
           </div>
@@ -173,16 +173,16 @@ export default function CurriculumArchitect({
 
         {/* Legend */}
         <div className="flex items-center gap-3 text-[11px] font-semibold flex-wrap">
-          <span className="flex items-center gap-1.5 text-green-700">
+          <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400">
             <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
             Published ({publishedCount})
           </span>
-          <span className="flex items-center gap-1.5 text-amber-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-300 ring-offset-1 inline-block" />
+          <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-300 dark:ring-amber-500 ring-offset-1 dark:ring-offset-zinc-900 inline-block" />
             Active Selection (Day {selectedDayNum})
           </span>
-          <span className="flex items-center gap-1.5 text-gray-500">
-            <span className="w-2.5 h-2.5 rounded-full border border-dashed border-gray-400 inline-block" />
+          <span className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
+            <span className="w-2.5 h-2.5 rounded-full border border-dashed border-gray-400 dark:border-zinc-500 inline-block" />
             Needs Content ({40 - publishedCount})
           </span>
         </div>
@@ -191,15 +191,15 @@ export default function CurriculumArchitect({
       {/* Main Grid: Roadmap on left (or top on mobile), Editor on right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
         {/* ── Left / Top: Roadmap Matrix (5 cols) ── */}
-        <div className="lg:col-span-5 bg-gray-50/60 rounded-2xl p-4 border border-gray-200/80">
+        <div className="lg:col-span-5 bg-gray-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+            <span className="text-xs font-bold text-gray-800 dark:text-zinc-200 uppercase tracking-wider">
               Cohort Full Roadmap (Days 1 — 40)
             </span>
-            <span className="text-[10px] text-gray-400">Click node to edit</span>
+            <span className="text-[10px] text-gray-400 dark:text-zinc-500">Click node to edit</span>
           </div>
 
-          {/* 40 nodes: 8 cols on mobile/tablet */}
+          {/* 40 nodes: 5 on mobile, 8 on sm */}
           <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
             {Array.from({ length: 40 }, (_, i) => i + 1).map((num) => {
               const day = dayMap.get(num)
@@ -216,10 +216,10 @@ export default function CurriculumArchitect({
                     relative flex flex-col items-center justify-center p-2 rounded-xl text-center transition
                     ${
                       isSelected
-                        ? 'bg-amber-500 text-white ring-4 ring-amber-200 shadow-md font-black scale-105 z-10'
+                        ? 'bg-amber-500 text-white ring-4 ring-amber-200 dark:ring-amber-500/40 shadow-md font-black scale-105 z-10'
                         : hasContent
-                        ? 'bg-white border border-green-300 text-gray-900 hover:border-amber-400 hover:shadow-sm'
-                        : 'bg-white/60 border border-dashed border-gray-300 text-gray-400 hover:border-gray-400'
+                        ? 'bg-white dark:bg-zinc-800 border border-green-300 dark:border-green-800 text-gray-900 dark:text-zinc-100 hover:border-amber-400 hover:shadow-sm'
+                        : 'bg-white/60 dark:bg-zinc-800/40 border border-dashed border-gray-300 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-gray-400'
                     }
                   `}
                 >
@@ -229,8 +229,8 @@ export default function CurriculumArchitect({
                       isSelected
                         ? 'text-white'
                         : hasContent
-                        ? 'text-green-600'
-                        : 'text-gray-400'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-400 dark:text-zinc-500'
                     }`}
                   >
                     {hasContent ? 'Ready' : 'Empty'}
@@ -241,7 +241,7 @@ export default function CurriculumArchitect({
                       className={`text-[7px] font-bold mt-0.5 px-1 rounded-full ${
                         isSelected
                           ? 'bg-amber-700 text-white'
-                          : 'bg-gray-100 text-gray-500'
+                          : 'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-zinc-300'
                       }`}
                     >
                       👤{compCount}
@@ -252,33 +252,33 @@ export default function CurriculumArchitect({
             })}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-gray-200/70 flex items-center justify-between text-[11px] text-gray-500 font-medium">
+          <div className="mt-4 pt-3 border-t border-gray-200/70 dark:border-zinc-800 flex items-center justify-between text-[11px] text-gray-500 dark:text-zinc-400 font-medium">
             <span>✓ {publishedCount} Published to congregation</span>
             <span>{40 - publishedCount} drafts needed</span>
           </div>
         </div>
 
         {/* ── Right / Bottom: Selected Day Content Editor (7 cols) ── */}
-        <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-amber-200/90 shadow-sm">
+        <div className="lg:col-span-7 bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-amber-200/90 dark:border-zinc-800 shadow-sm transition-colors">
           <form onSubmit={handleSave} className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-zinc-800">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/40">
                   Selected: Day {selectedDayNum}
                 </span>
                 {targetDateStr && (
-                  <span className="text-xs text-gray-400 ml-2">
+                  <span className="text-xs text-gray-400 dark:text-zinc-500 ml-2">
                     {targetDateStr}
                   </span>
                 )}
-                <h3 className="text-sm font-bold text-gray-900 mt-1">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-zinc-100 mt-1">
                   Day {selectedDayNum}: Edit Devotional &amp; Activities
                 </h3>
               </div>
 
               {countMap.get(selectedDayNum) !== undefined && (
                 <div className="text-right">
-                  <span className="text-xs font-black text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-black text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200/50 dark:border-green-800/40 px-2.5 py-1 rounded-full">
                     {countMap.get(selectedDayNum)} Completed
                   </span>
                 </div>
@@ -287,7 +287,7 @@ export default function CurriculumArchitect({
 
             {/* Day Title */}
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
                 Day Title
               </label>
               <input
@@ -296,13 +296,13 @@ export default function CurriculumArchitect({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Day 14: Walking in the Spirit — Consecrated Morning Prayer"
-                className="w-full px-3 py-2 text-xs font-medium bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+                className="w-full px-3.5 py-2 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-sm placeholder:text-gray-400 dark:placeholder:text-zinc-500"
               />
             </div>
 
             {/* Scripture Reference */}
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
                 Scripture Reference
               </label>
               <div className="relative">
@@ -311,9 +311,9 @@ export default function CurriculumArchitect({
                   value={scripture}
                   onChange={(e) => setScripture(e.target.value)}
                   placeholder="e.g. Galatians 5:16-25 & Romans 8:1-14"
-                  className="w-full px-3 py-2 pr-9 text-xs font-medium bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+                  className="w-full px-3.5 py-2 pr-9 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-sm placeholder:text-gray-400 dark:placeholder:text-zinc-500"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500 text-sm">
                   📖
                 </span>
               </div>
@@ -321,7 +321,7 @@ export default function CurriculumArchitect({
 
             {/* Devotional Exhortation */}
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
+              <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
                 Daily Devotional Summary &amp; Exhortation
               </label>
               <textarea
@@ -329,17 +329,17 @@ export default function CurriculumArchitect({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Beloved BBCC family, today our focus deepens into true yieldedness..."
-                className="w-full px-3 py-2 text-xs font-medium bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none transition"
+                className="w-full px-3.5 py-2 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none transition shadow-sm placeholder:text-gray-400 dark:placeholder:text-zinc-500"
               />
             </div>
 
             {/* Daily Required Activities Checklist */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-gray-700">
+                <label className="text-xs font-bold text-gray-800 dark:text-zinc-200">
                   Daily Required Checklist ({activities.length} Activities)
                 </label>
-                <span className="text-[10px] text-gray-400">
+                <span className="text-[10px] text-gray-400 dark:text-zinc-500">
                   Reorder or customize
                 </span>
               </div>
@@ -348,7 +348,7 @@ export default function CurriculumArchitect({
                 {activities.map((act, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200/80"
+                    className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-800/80 p-2 rounded-xl border border-gray-200/80 dark:border-zinc-700 transition-colors"
                   >
                     {/* Reorder Buttons */}
                     <div className="flex flex-col items-center gap-0.5">
@@ -357,7 +357,7 @@ export default function CurriculumArchitect({
                         onClick={() => handleMoveActivity(idx, 'up')}
                         disabled={idx === 0}
                         aria-label="Move activity up"
-                        className="text-[9px] text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
+                        className="text-[9px] text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-20 leading-none"
                       >
                         ▲
                       </button>
@@ -366,13 +366,13 @@ export default function CurriculumArchitect({
                         onClick={() => handleMoveActivity(idx, 'down')}
                         disabled={idx === activities.length - 1}
                         aria-label="Move activity down"
-                        className="text-[9px] text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
+                        className="text-[9px] text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-20 leading-none"
                       >
                         ▼
                       </button>
                     </div>
 
-                    <span className="w-5 h-5 rounded-full bg-green-500 text-white font-bold text-[10px] flex items-center justify-center flex-shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-green-500 text-white font-black text-[10px] flex items-center justify-center flex-shrink-0">
                       {idx + 1}
                     </span>
 
@@ -381,14 +381,14 @@ export default function CurriculumArchitect({
                       required
                       value={act.description}
                       onChange={(e) => handleUpdateActivity(idx, e.target.value)}
-                      className="flex-1 px-2.5 py-1 text-xs font-medium bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-sm"
                     />
 
                     <button
                       type="button"
                       onClick={() => handleDeleteActivity(idx)}
                       title="Remove activity"
-                      className="w-6 h-6 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center text-xs transition"
+                      className="w-6 h-6 rounded-lg text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center justify-center text-xs transition"
                     >
                       ✕
                     </button>
@@ -399,7 +399,7 @@ export default function CurriculumArchitect({
               <button
                 type="button"
                 onClick={handleAddActivity}
-                className="mt-2.5 w-full py-2 border border-dashed border-gray-300 hover:border-amber-400 hover:bg-amber-50/50 text-gray-600 hover:text-amber-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                className="mt-2.5 w-full py-2 border border-dashed border-gray-300 dark:border-zinc-700 hover:border-amber-400 dark:hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/30 text-gray-600 dark:text-zinc-400 hover:text-amber-700 dark:hover:text-amber-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
               >
                 + Add New Activity Prompt
               </button>
@@ -409,8 +409,8 @@ export default function CurriculumArchitect({
               <div
                 className={`text-xs px-3 py-2 rounded-xl font-medium ${
                   feedback.type === 'success'
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
+                    ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                    : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
                 }`}
               >
                 {feedback.text}
@@ -420,7 +420,7 @@ export default function CurriculumArchitect({
             <button
               type="submit"
               disabled={isPending}
-              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md shadow-amber-200 flex items-center justify-center gap-2 transition"
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 transition"
             >
               💾 {isPending ? 'Publishing…' : `Save & Publish Day ${selectedDayNum}`}
             </button>

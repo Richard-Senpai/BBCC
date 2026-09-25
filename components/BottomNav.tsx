@@ -9,7 +9,7 @@ const tabs = [
     href: '/dashboard',
     icon: (active: boolean) => (
       <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500' : 'text-gray-400'}`}
+        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
         fill={active ? 'currentColor' : 'none'}
         stroke="currentColor"
         strokeWidth={active ? 0 : 2}
@@ -28,7 +28,7 @@ const tabs = [
     href: '/dashboard/progress',
     icon: (active: boolean) => (
       <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500' : 'text-gray-400'}`}
+        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
         fill={active ? 'currentColor' : 'none'}
         stroke="currentColor"
         strokeWidth={active ? 0 : 2}
@@ -43,11 +43,30 @@ const tabs = [
     ),
   },
   {
+    label: 'Community',
+    href: '/community',
+    icon: (active: boolean) => (
+      <svg
+        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
+        fill={active ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={active ? 0 : 2}
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+        />
+      </svg>
+    ),
+  },
+  {
     label: 'Leaderboard',
     href: '/leaderboard',
     icon: (active: boolean) => (
       <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500' : 'text-gray-400'}`}
+        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
         fill={active ? 'currentColor' : 'none'}
         stroke="currentColor"
         strokeWidth={active ? 0 : 2}
@@ -66,7 +85,7 @@ const tabs = [
     href: '/dashboard/profile',
     icon: (active: boolean) => (
       <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500' : 'text-gray-400'}`}
+        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
         fill={active ? 'currentColor' : 'none'}
         stroke="currentColor"
         strokeWidth={active ? 0 : 2}
@@ -86,7 +105,7 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 safe-area-pb">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800 safe-area-pb transition-colors">
       <div className="max-w-md mx-auto flex">
         {tabs.map((tab) => {
           const active =
@@ -99,11 +118,19 @@ export default function BottomNav() {
               key={tab.href}
               href={tab.href}
               className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${
-                active ? 'text-amber-500' : 'text-gray-400 hover:text-gray-600'
+                active
+                  ? 'text-amber-500 dark:text-amber-400'
+                  : 'text-gray-400 dark:text-zinc-500 hover:text-gray-600 dark:hover:text-zinc-300'
               }`}
             >
               {tab.icon(active)}
-              <span className={`text-[10px] font-medium ${active ? 'text-amber-500' : 'text-gray-400'}`}>
+              <span
+                className={`text-[10px] font-medium ${
+                  active
+                    ? 'text-amber-500 dark:text-amber-400'
+                    : 'text-gray-400 dark:text-zinc-500'
+                }`}
+              >
                 {tab.label}
               </span>
             </Link>

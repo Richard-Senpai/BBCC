@@ -8,10 +8,8 @@ interface ActivityChecklistProps {
   dayId: string
   dayNumber: number
   activities: Activity[]
-  /** Array of activity IDs the user has already completed */
   initialCompletedIds: string[]
   isDayComplete: boolean
-  /** Only today's day is interactive; past days are read-only */
   isToday: boolean
 }
 
@@ -22,8 +20,6 @@ export default function ActivityChecklist({
   initialCompletedIds,
   isToday,
 }: ActivityChecklistProps) {
-  // useOptimistic gives an instant local state that reverts to the
-  // server state once the Server Action settles.
   const [optimisticDone, toggleOptimistic] = useOptimistic(
     new Set(initialCompletedIds),
     (current: Set<string>, activityId: string) => {
@@ -53,10 +49,10 @@ export default function ActivityChecklist({
     <div>
       {/* Header row */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-gray-900 text-sm">
+        <h3 className="font-bold text-gray-900 dark:text-zinc-100 text-sm">
           Daily Consecration Checklist
         </h3>
-        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-800/40">
           {doneCount} of {total} Done
         </span>
       </div>
@@ -74,9 +70,10 @@ export default function ActivityChecklist({
               className={`
                 w-full flex items-start gap-3 p-3 rounded-xl border text-left
                 transition-all duration-150
-                ${done
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-white border-gray-200 hover:border-amber-300'
+                ${
+                  done
+                    ? 'bg-green-50/90 dark:bg-green-950/30 border-green-300 dark:border-green-800/60'
+                    : 'bg-white dark:bg-zinc-800/90 border-gray-200 dark:border-zinc-700 hover:border-amber-400 dark:hover:border-amber-400'
                 }
                 ${!isToday ? 'opacity-70 cursor-default' : 'cursor-pointer active:scale-[0.99]'}
               `}
@@ -86,9 +83,10 @@ export default function ActivityChecklist({
                 className={`
                   mt-0.5 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center
                   border-2 transition-all
-                  ${done
-                    ? 'bg-green-500 border-green-500'
-                    : 'border-gray-300 bg-white'
+                  ${
+                    done
+                      ? 'bg-green-500 border-green-500'
+                      : 'border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
                   }
                 `}
               >
@@ -101,14 +99,24 @@ export default function ActivityChecklist({
 
               {/* Text */}
               <div className="min-w-0">
-                <p className={`text-sm font-medium leading-snug ${done ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                <p
+                  className={`text-sm font-semibold leading-snug ${
+                    done
+                      ? 'text-gray-400 dark:text-zinc-500 line-through'
+                      : 'text-gray-900 dark:text-zinc-100'
+                  }`}
+                >
                   {activity.description}
                 </p>
                 {!done && isToday && (
-                  <p className="text-xs text-gray-400 mt-0.5">Pending</p>
+                  <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5 font-medium">
+                    Pending
+                  </p>
                 )}
                 {done && (
-                  <p className="text-xs text-green-600 mt-0.5 font-medium">Completed ✓</p>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 font-bold">
+                    Completed ✓
+                  </p>
                 )}
               </div>
             </button>
@@ -118,14 +126,14 @@ export default function ActivityChecklist({
 
       {/* Spiritual Reflections textarea */}
       <div className="mt-4">
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <label className="text-xs font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
           Spiritual Reflections &amp; Journal Note
         </label>
         <textarea
           placeholder="Write today's revelations, prayers, or answers received during communion with the Lord…"
           rows={3}
           disabled={!isToday}
-          className="mt-1.5 w-full text-sm text-gray-700 placeholder:text-gray-300 bg-gray-50 border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent disabled:opacity-60"
+          className="mt-1.5 w-full text-sm font-medium p-3 rounded-xl border transition-all resize-none bg-white text-gray-950 placeholder:text-gray-400 border-gray-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:focus:ring-amber-400 shadow-sm disabled:opacity-60"
         />
       </div>
 
@@ -135,10 +143,11 @@ export default function ActivityChecklist({
           type="button"
           className={`
             w-full mt-4 py-3.5 rounded-xl font-bold text-white text-sm
-            flex items-center justify-center gap-2 transition-all
-            ${allDone
-              ? 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-200'
-              : 'bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-200'
+            flex items-center justify-center gap-2 transition-all shadow-md
+            ${
+              allDone
+                ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20'
+                : 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20'
             }
           `}
         >
