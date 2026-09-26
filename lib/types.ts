@@ -15,6 +15,8 @@ export type ChallengeSettings = {
   id: 1
   start_date: string | null
   timezone: string
+  duration_days: number
+  challenge_name: string
   updated_at: string
 }
 
@@ -128,12 +130,16 @@ export type Database = {
           id?: 1
           start_date?: string | null
           timezone?: string
+          duration_days?: number
+          challenge_name?: string
           updated_at?: string
         }
         Update: {
           id?: 1
           start_date?: string | null
           timezone?: string
+          duration_days?: number
+          challenge_name?: string
           updated_at?: string
         }
         Relationships: []

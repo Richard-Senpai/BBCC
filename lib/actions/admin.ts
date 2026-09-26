@@ -31,25 +31,33 @@ async function assertAdmin() {
  */
 export async function updateChallengeSettings(
   startDate: string | null,
-  timezone = 'Africa/Lagos'
+  timezone = 'Africa/Lagos',
+  durationDays = 40,
+  challengeName = 'Overcomer'
 ) {
   const { supabase } = await assertAdmin()
 
+  // Use update() (not upsert) — row id=1 is always guaranteed to exist.
   const { error } = await supabase
     .from('challenge_settings')
-    .upsert({
-      id: 1,
+    .update({
       start_date: startDate || null,
       timezone: timezone || 'Africa/Lagos',
+      duration_days: Math.max(1, Math.min(365, durationDays)),
+      challenge_name: challengeName.trim() || 'Overcomer',
       updated_at: new Date().toISOString(),
     })
+    .eq('id', 1)
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(`Failed to save settings: ${error.message}`)
 
-  revalidatePath('/admin')
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/progress')
-  revalidatePath('/leaderboard')
+  revalidatePath('/admin', 'page')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/dashboard', 'page')
+  revalidatePath('/dashboard', 'layout')
+  revalidatePath('/dashboard/progress', 'page')
+  revalidatePath('/leaderboard', 'page')
+  revalidatePath('/community', 'page')
   return { success: true }
 }
 
@@ -89,10 +97,15 @@ export async function saveChallengeDay(params: {
   const dayId = dayRow.id
 
   // 2. Fetch existing activities for this day
-  const { data: existingActivities } = await supabase
+  const { data: existingActivities, error: existingError } = await supabase
     .from('activities')
     .select('id')
     .eq('challenge_day_id', dayId)
+
+  if (existingError) {
+    console.error('Error fetching existing activities:', existingError)
+    throw new Error(`Failed to check existing activities: ${existingError.message}`)
+  }
 
   const existingIds = new Set((existingActivities ?? []).map((a) => a.id))
   const incomingIds = new Set(
@@ -102,49 +115,74 @@ export async function saveChallengeDay(params: {
   // 3. Delete removed activities
   const toDelete = [...existingIds].filter((id) => !incomingIds.has(id))
   if (toDelete.length > 0) {
-    await supabase.from('activities').delete().in('id', toDelete)
+    const { error: delError } = await supabase.from('activities').delete().in('id', toDelete)
+    if (delError) {
+      console.error('Error deleting removed activities:', delError)
+      throw new Error(`Failed to delete removed activities: ${delError.message}`)
+    }
   }
 
-  // 4. Upsert/insert activities
+  // 4. Upsert/insert activities with strict error verification
   for (let i = 0; i < activities.length; i++) {
     const act = activities[i]
     if (act.id && existingIds.has(act.id)) {
-      await supabase
+      const { error: updError } = await supabase
         .from('activities')
         .update({
           description: act.description.trim(),
           sort_order: i + 1,
         })
         .eq('id', act.id)
+
+      if (updError) {
+        console.error('Error updating activity:', updError)
+        throw new Error(`Failed to update activity "${act.description}": ${updError.message}`)
+      }
     } else {
-      await supabase.from('activities').insert({
+      const { error: insError } = await supabase.from('activities').insert({
         challenge_day_id: dayId,
         description: act.description.trim(),
         sort_order: i + 1,
       })
+
+      if (insError) {
+        console.error('Error inserting activity:', insError)
+        throw new Error(`Failed to save activity "${act.description}": ${insError.message}`)
+      }
     }
   }
 
   revalidatePath('/admin')
-  revalidatePath('/dashboard')
+  revalidatePath('/dashboard', 'page')
+  revalidatePath('/dashboard', 'layout')
+  revalidatePath('/dashboard/progress', 'page')
   return { success: true, dayId }
 }
 
 /**
- * Initialize / quick-populate all 40 challenge days with default templates
- * if they don't already exist.
+ * Initialize / quick-populate all challenge days with default templates
+ * if they don't already exist, up to duration_days from settings.
  */
-export async function seed40Days() {
+export async function seedChallengeDays() {
   const { supabase } = await assertAdmin()
 
-  for (let i = 1; i <= 40; i++) {
+  const { data: settings } = await supabase
+    .from('challenge_settings')
+    .select('duration_days, challenge_name')
+    .eq('id', 1)
+    .single()
+
+  const dur = settings?.duration_days ?? 40
+  const cname = settings?.challenge_name ?? 'Overcomer'
+
+  for (let i = 1; i <= dur; i++) {
     const { data: dayRow } = await supabase
       .from('challenge_days')
       .upsert(
         {
           day_number: i,
           title: `Day ${i}: Consecration & Spiritual Discipline`,
-          description: `Daily devotional focus and prayer alignment for Day ${i} of the 40-Day Challenge.`,
+          description: `Daily devotional focus and prayer alignment for Day ${i} of the ${dur} Days of ${cname} Challenge.`,
           scripture_reference: 'Galatians 5:16-25 & Romans 8:1-14',
         },
         { onConflict: 'day_number' }
@@ -182,5 +220,7 @@ export async function seed40Days() {
 
   revalidatePath('/admin')
   revalidatePath('/dashboard')
-  return { success: true }
+  return { success: true, count: dur }
 }
+
+export const seed40Days = seedChallengeDays
