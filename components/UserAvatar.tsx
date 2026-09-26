@@ -47,9 +47,9 @@ export default function UserAvatar({
   return (
     <div
       className={`
-        ${dim} rounded-full flex-shrink-0 flex items-center justify-center font-black
-        bg-gradient-to-tr from-amber-500 to-amber-300 text-white shadow-inner
-        ring-2 ring-amber-400/40 select-none
+        ${dim} rounded-full shrink-0 flex items-center justify-center font-bold
+        bg-[var(--bg-subtle)] text-[var(--flame-accent)]
+        ring-1 ring-[var(--border-subtle)] select-none
         ${className}
       `}
     >

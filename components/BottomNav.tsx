@@ -2,102 +2,39 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import {
+  CalendarCheck2,
+  TrendingUp,
+  MessageSquare,
+  Trophy,
+  User,
+} from 'lucide-react'
 
 const tabs = [
   {
     label: 'Today',
     href: '/dashboard',
-    icon: (active: boolean) => (
-      <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
-        fill={active ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth={active ? 0 : 2}
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-        />
-      </svg>
-    ),
+    Icon: CalendarCheck2,
   },
   {
     label: 'Progress',
     href: '/dashboard/progress',
-    icon: (active: boolean) => (
-      <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
-        fill={active ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth={active ? 0 : 2}
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-        />
-      </svg>
-    ),
+    Icon: TrendingUp,
   },
   {
     label: 'Community',
     href: '/community',
-    icon: (active: boolean) => (
-      <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
-        fill={active ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth={active ? 0 : 2}
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-        />
-      </svg>
-    ),
+    Icon: MessageSquare,
   },
   {
     label: 'Leaderboard',
     href: '/leaderboard',
-    icon: (active: boolean) => (
-      <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
-        fill={active ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth={active ? 0 : 2}
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 15l-3.5 2.5 1.5-4L6 11h4l2-4.5L14 11h4l-3.5 2.5 1.5 4L12 15z"
-        />
-      </svg>
-    ),
+    Icon: Trophy,
   },
   {
     label: 'Profile',
     href: '/dashboard/profile',
-    icon: (active: boolean) => (
-      <svg
-        className={`w-5 h-5 ${active ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-zinc-500'}`}
-        fill={active ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth={active ? 0 : 2}
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-        />
-      </svg>
-    ),
+    Icon: User,
   },
 ]
 
@@ -105,30 +42,39 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800 safe-area-pb transition-colors">
-      <div className="max-w-md mx-auto flex">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] safe-area-pb transition-colors shadow-xs">
+      <div className="max-w-md mx-auto flex items-center h-16 px-1">
         {tabs.map((tab) => {
           const active =
             tab.href === '/dashboard'
               ? pathname === '/dashboard'
               : pathname.startsWith(tab.href)
 
+          const IconComponent = tab.Icon
+
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${
+              className={`flex-1 flex flex-col items-center justify-center py-1.5 transition-colors relative ${
                 active
-                  ? 'text-amber-500 dark:text-amber-400'
-                  : 'text-gray-400 dark:text-zinc-500 hover:text-gray-600 dark:hover:text-zinc-300'
+                  ? 'text-[var(--flame-accent)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-ink)]'
               }`}
             >
-              {tab.icon(active)}
+              <div className="relative">
+                <IconComponent
+                  size={20}
+                  strokeWidth={active ? 2.2 : 1.75}
+                  className="transition-transform duration-150"
+                />
+                {active && (
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--flame-accent)]" />
+                )}
+              </div>
               <span
-                className={`text-[10px] font-medium ${
-                  active
-                    ? 'text-amber-500 dark:text-amber-400'
-                    : 'text-gray-400 dark:text-zinc-500'
+                className={`text-[10px] mt-1 font-medium tracking-tight ${
+                  active ? 'font-semibold text-[var(--flame-accent)]' : 'text-[var(--text-muted)]'
                 }`}
               >
                 {tab.label}
@@ -140,3 +86,4 @@ export default function BottomNav() {
     </nav>
   )
 }
+

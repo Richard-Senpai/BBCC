@@ -1,6 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import {
+  BookOpen,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Check,
+  Users,
+} from 'lucide-react'
 import { saveChallengeDay } from '@/lib/actions/admin'
 import type { ChallengeDayWithActivities, DayCompletionCount } from '@/lib/types'
 
@@ -160,51 +169,53 @@ export default function CurriculumArchitect({
   ).length
 
   return (
-    <section className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-200 dark:border-zinc-800 mt-6 transition-colors">
+    <section className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors">
       {/* Title & Legend */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 dark:border-zinc-800 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[var(--border-hairline)] gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🏛️</span>
+          <span className="text-[var(--flame-accent)]">
+            <BookOpen size={18} strokeWidth={1.75} />
+          </span>
           <div>
-            <h2 className="text-base font-black text-gray-900 dark:text-zinc-100">
+            <h2 className="text-sm font-semibold text-[var(--text-ink)]">
               {durationDays}-Day Curriculum Matrix &amp; Content Architect
             </h2>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Tap any day node to inspect details or preview publishing readiness for {durationDays} Days of {challengeName}.
+            <p className="text-xs text-[var(--text-muted)]">
+              Select any day node to inspect details or preview publishing readiness for {durationDays} Days of {challengeName}.
             </p>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 text-[11px] font-semibold flex-wrap">
-          <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+        <div className="flex items-center gap-3 text-[11px] font-medium flex-wrap">
+          <span className="flex items-center gap-1.5 text-[var(--olive-accent)]">
+            <span className="w-2 h-2 rounded-full bg-[var(--olive-accent)] inline-block" />
             Published ({publishedCount})
           </span>
-          <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-300 dark:ring-amber-500 ring-offset-1 dark:ring-offset-zinc-900 inline-block" />
-            Active Selection (Day {selectedDayNum})
+          <span className="flex items-center gap-1.5 text-[var(--flame-accent)]">
+            <span className="w-2 h-2 rounded-full bg-[var(--flame-accent)] inline-block" />
+            Selected (Day {selectedDayNum})
           </span>
-          <span className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
-            <span className="w-2.5 h-2.5 rounded-full border border-dashed border-gray-400 dark:border-zinc-500 inline-block" />
+          <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+            <span className="w-2 h-2 rounded-full border border-dashed border-[var(--text-muted)] inline-block" />
             Needs Content ({Math.max(0, durationDays - publishedCount)})
           </span>
         </div>
       </div>
 
-      {/* Main Grid: Roadmap on left (or top on mobile), Editor on right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
+      {/* Main Grid: Roadmap on left, Editor on right */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
         {/* ── Left / Top: Roadmap Matrix (5 cols) ── */}
-        <div className="lg:col-span-5 bg-gray-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-zinc-800">
+        <div className="lg:col-span-5 bg-[var(--bg-subtle)] rounded-xl p-4 border border-[var(--border-hairline)]">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-gray-800 dark:text-zinc-200 uppercase tracking-wider">
-              Cohort Full Roadmap (Days 1 — {durationDays})
+            <span className="text-[11px] font-semibold text-[var(--text-ink)] uppercase tracking-wider">
+              Roadmap (Days 1 — {durationDays})
             </span>
-            <span className="text-[10px] text-gray-400 dark:text-zinc-500">Click node to edit</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Click node to edit</span>
           </div>
 
           {/* Grid nodes */}
-          <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
+          <div className="grid grid-cols-5 sm:grid-cols-8 gap-1.5">
             {Array.from({ length: durationDays }, (_, i) => i + 1).map((num) => {
               const day = dayMap.get(num)
               const hasContent = day && (day.activities?.length ?? 0) > 0
@@ -217,24 +228,24 @@ export default function CurriculumArchitect({
                   type="button"
                   onClick={() => handleSelectDay(num)}
                   className={`
-                    relative flex flex-col items-center justify-center p-2 rounded-xl text-center transition
+                    relative flex flex-col items-center justify-center p-1.5 rounded-lg text-center transition cursor-pointer
                     ${
                       isSelected
-                        ? 'bg-amber-500 text-white ring-4 ring-amber-200 dark:ring-amber-500/40 shadow-md font-black scale-105 z-10'
+                        ? 'bg-[var(--flame-accent)] text-white shadow-xs font-bold scale-105 z-10'
                         : hasContent
-                        ? 'bg-white dark:bg-zinc-800 border border-green-300 dark:border-green-800 text-gray-900 dark:text-zinc-100 hover:border-amber-400 hover:shadow-sm'
-                        : 'bg-white/60 dark:bg-zinc-800/40 border border-dashed border-gray-300 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-gray-400'
+                        ? 'bg-[var(--bg-surface)] border border-[var(--olive-accent)]/50 text-[var(--text-ink)] hover:border-[var(--flame-accent)]'
+                        : 'bg-[var(--bg-surface)]/50 border border-dashed border-[var(--border-hairline)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
                     }
                   `}
                 >
-                  <span className="text-xs font-black leading-none">{num}</span>
+                  <span className="text-xs font-semibold leading-none">{num}</span>
                   <span
-                    className={`text-[8px] font-bold mt-1 leading-none ${
+                    className={`text-[8px] font-medium mt-1 leading-none ${
                       isSelected
-                        ? 'text-white'
+                        ? 'text-white/90'
                         : hasContent
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-400 dark:text-zinc-500'
+                        ? 'text-[var(--olive-accent)]'
+                        : 'text-[var(--text-muted)]'
                     }`}
                   >
                     {hasContent ? 'Ready' : 'Empty'}
@@ -242,13 +253,14 @@ export default function CurriculumArchitect({
                   {compCount > 0 && (
                     <span
                       title={`${compCount} members completed`}
-                      className={`text-[7px] font-bold mt-0.5 px-1 rounded-full ${
+                      className={`text-[7px] font-medium mt-0.5 px-1 rounded flex items-center gap-0.5 ${
                         isSelected
-                          ? 'bg-amber-700 text-white'
-                          : 'bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-zinc-300'
+                          ? 'bg-black/20 text-white'
+                          : 'bg-[var(--bg-subtle)] text-[var(--text-muted)]'
                       }`}
                     >
-                      👤{compCount}
+                      <Users size={8} />
+                      {compCount}
                     </span>
                   )}
                 </button>
@@ -256,33 +268,33 @@ export default function CurriculumArchitect({
             })}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-gray-200/70 dark:border-zinc-800 flex items-center justify-between text-[11px] text-gray-500 dark:text-zinc-400 font-medium">
-            <span>✓ {publishedCount} Published to congregation</span>
+          <div className="mt-4 pt-3 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+            <span>{publishedCount} Published</span>
             <span>{Math.max(0, durationDays - publishedCount)} drafts needed</span>
           </div>
         </div>
 
         {/* ── Right / Bottom: Selected Day Content Editor (7 cols) ── */}
-        <div className="lg:col-span-7 bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-amber-200/90 dark:border-zinc-800 shadow-sm transition-colors">
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-zinc-800">
+        <div className="lg:col-span-7 bg-[var(--bg-surface)] rounded-xl p-4 border border-[var(--border-hairline)] shadow-xs transition-colors">
+          <form onSubmit={handleSave} className="space-y-3.5">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-hairline)]">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/40">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-2 py-0.5 rounded border border-[var(--border-hairline)]">
                   Selected: Day {selectedDayNum}
                 </span>
                 {targetDateStr && (
-                  <span className="text-xs text-gray-400 dark:text-zinc-500 ml-2">
+                  <span className="text-xs text-[var(--text-muted)] ml-2">
                     {targetDateStr}
                   </span>
                 )}
-                <h3 className="text-sm font-bold text-gray-900 dark:text-zinc-100 mt-1">
+                <h3 className="text-xs font-semibold text-[var(--text-ink)] mt-1">
                   Day {selectedDayNum}: Edit Devotional &amp; Activities
                 </h3>
               </div>
 
               {countMap.get(selectedDayNum) !== undefined && (
                 <div className="text-right">
-                  <span className="text-xs font-black text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200/50 dark:border-green-800/40 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-medium text-[var(--olive-accent)] bg-[var(--bg-subtle)] border border-[var(--border-hairline)] px-2 py-0.5 rounded-full">
                     {countMap.get(selectedDayNum)} Completed
                   </span>
                 </div>
@@ -291,7 +303,7 @@ export default function CurriculumArchitect({
 
             {/* Day Title */}
             <div>
-              <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+              <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
                 Day Title
               </label>
               <input
@@ -300,13 +312,13 @@ export default function CurriculumArchitect({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Day 14: Walking in the Spirit — Consecrated Morning Prayer"
-                className="w-full px-3.5 py-2 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-sm placeholder:text-gray-400 dark:placeholder:text-zinc-500"
+                className="w-full px-3 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition shadow-xs placeholder:text-[var(--text-muted)]"
               />
             </div>
 
             {/* Scripture Reference */}
             <div>
-              <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+              <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
                 Scripture Reference
               </label>
               <div className="relative">
@@ -315,17 +327,17 @@ export default function CurriculumArchitect({
                   value={scripture}
                   onChange={(e) => setScripture(e.target.value)}
                   placeholder="e.g. Galatians 5:16-25 & Romans 8:1-14"
-                  className="w-full px-3.5 py-2 pr-9 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition shadow-sm placeholder:text-gray-400 dark:placeholder:text-zinc-500"
+                  className="w-full px-3 py-1.5 pr-8 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition shadow-xs placeholder:text-[var(--text-muted)]"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500 text-sm">
-                  📖
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                  <BookOpen size={13} strokeWidth={1.75} />
                 </span>
               </div>
             </div>
 
             {/* Devotional Exhortation */}
             <div>
-              <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+              <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
                 Daily Devotional Summary &amp; Exhortation
               </label>
               <textarea
@@ -333,50 +345,50 @@ export default function CurriculumArchitect({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Beloved BBCC family, today our focus deepens into true yieldedness..."
-                className="w-full px-3.5 py-2 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none transition shadow-sm placeholder:text-gray-400 dark:placeholder:text-zinc-500"
+                className="w-full px-3 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] resize-none transition shadow-xs placeholder:text-[var(--text-muted)]"
               />
             </div>
 
             {/* Daily Required Activities Checklist */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-gray-800 dark:text-zinc-200">
-                  Daily Required Checklist ({activities.length} Activities)
+                <label className="text-[11px] font-medium text-[var(--text-ink)]">
+                  Required Activities ({activities.length})
                 </label>
-                <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+                <span className="text-[10px] text-[var(--text-muted)]">
                   Reorder or customize
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {activities.map((act, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-800/80 p-2 rounded-xl border border-gray-200/80 dark:border-zinc-700 transition-colors"
+                    className="flex items-center gap-2 bg-[var(--bg-subtle)] p-2 rounded-lg border border-[var(--border-hairline)] transition-colors"
                   >
                     {/* Reorder Buttons */}
-                    <div className="flex flex-col items-center gap-0.5">
+                    <div className="flex flex-col items-center">
                       <button
                         type="button"
                         onClick={() => handleMoveActivity(idx, 'up')}
                         disabled={idx === 0}
                         aria-label="Move activity up"
-                        className="text-[9px] text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-20 leading-none"
+                        className="text-[var(--text-muted)] hover:text-[var(--text-ink)] disabled:opacity-20 cursor-pointer"
                       >
-                        ▲
+                        <ChevronUp size={11} strokeWidth={2} />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleMoveActivity(idx, 'down')}
                         disabled={idx === activities.length - 1}
                         aria-label="Move activity down"
-                        className="text-[9px] text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 disabled:opacity-20 leading-none"
+                        className="text-[var(--text-muted)] hover:text-[var(--text-ink)] disabled:opacity-20 cursor-pointer"
                       >
-                        ▼
+                        <ChevronDown size={11} strokeWidth={2} />
                       </button>
                     </div>
 
-                    <span className="w-5 h-5 rounded-full bg-green-500 text-white font-black text-[10px] flex items-center justify-center flex-shrink-0">
+                    <span className="w-4 h-4 rounded-full bg-[var(--olive-accent)] text-white font-bold text-[9px] flex items-center justify-center shrink-0">
                       {idx + 1}
                     </span>
 
@@ -385,16 +397,16 @@ export default function CurriculumArchitect({
                       required
                       value={act.description}
                       onChange={(e) => handleUpdateActivity(idx, e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-xs font-semibold bg-white text-gray-900 border border-gray-300 dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-sm"
+                      className="flex-1 px-2.5 py-1 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs"
                     />
 
                     <button
                       type="button"
                       onClick={() => handleDeleteActivity(idx)}
                       title="Remove activity"
-                      className="w-6 h-6 rounded-lg text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center justify-center text-xs transition"
+                      className="w-6 h-6 rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 flex items-center justify-center transition cursor-pointer"
                     >
-                      ✕
+                      <Trash2 size={12} strokeWidth={1.75} />
                     </button>
                   </div>
                 ))}
@@ -403,18 +415,19 @@ export default function CurriculumArchitect({
               <button
                 type="button"
                 onClick={handleAddActivity}
-                className="mt-2.5 w-full py-2 border border-dashed border-gray-300 dark:border-zinc-700 hover:border-amber-400 dark:hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/30 text-gray-600 dark:text-zinc-400 hover:text-amber-700 dark:hover:text-amber-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                className="mt-2 w-full py-1.5 border border-dashed border-[var(--border-hairline)] hover:border-[var(--flame-accent)] text-[var(--text-muted)] hover:text-[var(--flame-accent)] font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                + Add New Activity Prompt
+                <Plus size={12} strokeWidth={1.75} />
+                <span>Add Activity Prompt</span>
               </button>
             </div>
 
             {feedback && (
               <div
-                className={`text-xs px-3 py-2 rounded-xl font-medium ${
+                className={`text-xs px-3 py-2 rounded-lg font-medium ${
                   feedback.type === 'success'
-                    ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                    : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    ? 'bg-green-500/10 text-[var(--olive-accent)] border border-green-500/25'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25'
                 }`}
               >
                 {feedback.text}
@@ -424,9 +437,10 @@ export default function CurriculumArchitect({
             <button
               type="submit"
               disabled={isPending}
-              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 transition"
+              className="w-full py-2.5 bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 text-white font-medium text-xs rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
-              💾 {isPending ? 'Publishing…' : `Save & Publish Day ${selectedDayNum}`}
+              <Check size={13} strokeWidth={2} />
+              <span>{isPending ? 'Publishing…' : `Save & Publish Day ${selectedDayNum}`}</span>
             </button>
           </form>
         </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { Camera, Check, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { updateAvatarUrl } from '@/lib/actions/profile'
 import UserAvatar from '@/components/UserAvatar'
@@ -133,7 +134,7 @@ export default function AvatarUploader({
     <div className="flex flex-col items-center">
       {/* Circular Avatar / Preview */}
       <div className="relative group">
-        <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-amber-400 shadow-md bg-gray-100 dark:bg-zinc-800">
+        <div className="w-24 h-24 rounded-full overflow-hidden ring-2 ring-[var(--flame-accent)]/50 shadow-xs bg-[var(--bg-subtle)]">
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -157,9 +158,9 @@ export default function AvatarUploader({
           onClick={() => fileInputRef.current?.click()}
           title="Upload picture"
           aria-label="Upload picture"
-          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center shadow-lg border-2 border-white dark:border-zinc-900 transition"
+          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--flame-accent)] hover:opacity-95 text-white flex items-center justify-center shadow-xs border-2 border-[var(--bg-surface)] transition cursor-pointer"
         >
-          📷
+          <Camera size={14} strokeWidth={1.75} />
         </button>
       </div>
 
@@ -179,15 +180,20 @@ export default function AvatarUploader({
             type="button"
             onClick={handleConfirmUpload}
             disabled={loading}
-            className="px-3.5 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
+            className="px-3 py-1.5 bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 text-white font-medium text-xs rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer"
           >
-            {loading ? 'Uploading…' : '✓ Save Avatar'}
+            {loading ? (
+              <Loader2 size={12} className="animate-spin text-white" />
+            ) : (
+              <Check size={12} strokeWidth={2} />
+            )}
+            <span>{loading ? 'Uploading…' : 'Save Photo'}</span>
           </button>
           <button
             type="button"
             onClick={handleCancelPreview}
             disabled={loading}
-            className="px-3 py-1.5 bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-800 dark:text-zinc-200 font-semibold text-xs rounded-xl transition"
+            className="px-3 py-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-muted)] hover:text-[var(--text-ink)] border border-[var(--border-hairline)] font-medium text-xs rounded-lg transition cursor-pointer"
           >
             Cancel
           </button>
@@ -195,13 +201,13 @@ export default function AvatarUploader({
       )}
 
       {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 px-3 py-1.5 rounded-xl text-center">
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/25 px-3 py-1.5 rounded-lg text-center">
           {error}
         </p>
       )}
 
       {success && (
-        <p className="mt-2 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 px-3 py-1.5 rounded-xl text-center">
+        <p className="mt-2 text-xs text-[var(--olive-accent)] bg-[var(--bg-subtle)] border border-[var(--border-hairline)] px-3 py-1.5 rounded-lg text-center font-medium">
           {success}
         </p>
       )}

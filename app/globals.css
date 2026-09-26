@@ -2,30 +2,79 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-sans: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
+
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-subtle: var(--bg-subtle);
+  --color-border: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--text-ink);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-flame: var(--flame-accent);
+  --color-covenant: var(--covenant-accent);
+}
+
 :root {
-  --bg-app: #FAF6EC;
-  --bg-card: #FFFFFF;
-  --text-main: #111827;
-  --text-muted: #6B7280;
-  --border-card: #E5E7EB;
+  --bg-canvas: #F7F7F5;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #EFEFEA;
+  --border-subtle: #E5E5DF;
+  --border-strong: #D2D2CA;
+  --text-ink: #17181A;
+  --text-muted: #666972;
+  --text-faint: #9D9FA6;
+  --flame-accent: #C86A1D;
+  --flame-subtle: #FDF5ED;
+  --covenant-accent: #236B46;
+  --covenant-subtle: #EEF7F2;
 }
 
 .dark {
-  --bg-app: #121215;
-  --bg-card: #1A1A20;
-  --text-main: #F9FAFB;
-  --text-muted: #9CA3AF;
-  --border-card: #2B2B34;
+  --bg-canvas: #111214;
+  --bg-surface: #18191D;
+  --bg-subtle: #202227;
+  --border-subtle: #27292F;
+  --border-strong: #3A3D46;
+  --text-ink: #F1F2F4;
+  --text-muted: #8E929C;
+  --text-faint: #5D6068;
+  --flame-accent: #E58B35;
+  --flame-subtle: #271A10;
+  --covenant-accent: #34D399;
+  --covenant-subtle: #0E2218;
 }
 
 body {
-  background-color: var(--bg-app);
-  color: var(--text-main);
-  font-family: Arial, Helvetica, sans-serif;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  background-color: var(--bg-canvas);
+  color: var(--text-ink);
+  font-family: var(--font-sans);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Unified accessible form styling across whole application */
+/* ── The Single Deliberate Motion Moment: Discipline Checkmark Spring ── */
+@keyframes checkSpring {
+  0% {
+    transform: scale(0.85);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-check-spring {
+  animation: checkSpring 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ── Refined Minimalist Form Input System ── */
 .bbcc-input {
   width: 100%;
   padding: 0.625rem 0.875rem;
@@ -33,34 +82,23 @@ body {
   font-weight: 500;
   line-height: 1.25rem;
   border-radius: 0.75rem;
-  transition: all 0.15s ease-in-out;
-  background-color: #FFFFFF;
-  color: #111827;
-  border: 1px solid #D1D5DB;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background-color: var(--bg-surface);
+  color: var(--text-ink);
+  border: 1px solid var(--border-subtle);
 }
 
 .bbcc-input::placeholder {
-  color: #9CA3AF;
+  color: var(--text-faint);
   font-weight: 400;
 }
 
 .bbcc-input:focus {
   outline: none;
-  border-color: #F59E0B;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
-}
-
-.dark .bbcc-input {
-  background-color: #24242C;
-  color: #F9FAFB;
-  border-color: #3F3F4A;
-}
-
-.dark .bbcc-input::placeholder {
-  color: #6B7280;
+  border-color: var(--flame-accent);
+  box-shadow: 0 0 0 3px rgba(200, 106, 29, 0.15);
 }
 
 .dark .bbcc-input:focus {
-  border-color: #FBBF24;
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+  box-shadow: 0 0 0 3px rgba(229, 139, 53, 0.22);
 }

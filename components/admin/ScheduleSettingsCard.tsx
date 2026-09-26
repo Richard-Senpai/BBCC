@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { Settings, Sparkles, Lock, AlertTriangle } from 'lucide-react'
 import { updateChallengeSettings, seedChallengeDays } from '@/lib/actions/admin'
 import type { ChallengeSettings } from '@/lib/types'
 
@@ -93,16 +94,18 @@ export default function ScheduleSettingsCard({
   const renderedPreview = `${durationDays} Days of ${challengeName.trim() || 'Overcomer'}`
 
   return (
-    <section className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-200 dark:border-zinc-800 transition-colors">
+    <section className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] transition-colors">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 dark:border-zinc-800 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[var(--border-hairline)] gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl">⚙️</span>
+          <span className="text-[var(--flame-accent)]">
+            <Settings size={18} strokeWidth={1.75} />
+          </span>
           <div>
-            <h2 className="text-base font-black text-gray-900 dark:text-zinc-100">
+            <h2 className="text-sm font-semibold text-[var(--text-ink)]">
               Challenge Configuration &amp; Temporal Synchronization
             </h2>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">
+            <p className="text-xs text-[var(--text-muted)]">
               Set challenge name, total duration, start date, and fellowship master clocks.
             </p>
           </div>
@@ -114,42 +117,46 @@ export default function ScheduleSettingsCard({
               type="button"
               onClick={handleSeed}
               disabled={isSeeding}
-              className="text-xs font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg shadow-sm transition"
+              className="text-xs font-medium bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
-              {isSeeding ? 'Initializing…' : `⚡ Initialize ${durationDays} Days`}
+              <Sparkles size={12} strokeWidth={1.75} />
+              <span>{isSeeding ? 'Initializing…' : `Initialize ${durationDays} Days`}</span>
             </button>
           )}
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">
-            🔒 Pastoral Key Locked
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-subtle)] px-2.5 py-1 rounded-lg border border-[var(--border-hairline)]">
+            <Lock size={12} strokeWidth={1.75} />
+            <span>Pastoral Key Locked</span>
           </span>
         </div>
       </div>
 
       {/* Live Preview Badge */}
-      <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3.5 flex items-center justify-between gap-3">
+      <div className="mt-4 bg-[var(--bg-subtle)] border border-[var(--border-hairline)] rounded-xl p-3.5 flex items-center justify-between gap-3">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-400">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--flame-accent)]">
             Dynamic Branding Live Preview
           </span>
-          <p className="text-base font-black text-gray-900 dark:text-zinc-50 mt-0.5">
+          <p className="text-sm font-semibold text-[var(--text-ink)] mt-0.5">
             {renderedPreview}
           </p>
-          <p className="text-[11px] text-amber-700 dark:text-amber-300/80 font-medium">
+          <p className="text-[11px] text-[var(--text-muted)]">
             This title will appear dynamically across member dashboards, login banners, and certificates.
           </p>
         </div>
-        <span className="text-xs font-bold bg-amber-500 text-white px-3 py-1 rounded-lg shadow-sm shrink-0">
-          Preview
+        <span className="text-xs font-medium text-[var(--flame-accent)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-md border border-[var(--border-hairline)] shrink-0">
+          Live Preview
         </span>
       </div>
 
       {/* Critical Temporal Modification Warning */}
       {isStarted && (
-        <div className="mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-xl p-3.5 flex items-start gap-3">
-          <span className="text-amber-600 dark:text-amber-400 text-lg flex-shrink-0 mt-0.5">⚠️</span>
-          <div className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
-            <p className="font-bold">Challenge In Progress</p>
-            <p className="mt-0.5 text-amber-800 dark:text-amber-300/90 font-medium">
+        <div className="mt-4 bg-amber-500/10 border border-amber-500/25 rounded-xl p-3.5 flex items-start gap-2.5">
+          <span className="text-[var(--flame-accent)] shrink-0 mt-0.5">
+            <AlertTriangle size={15} strokeWidth={1.75} />
+          </span>
+          <div className="text-xs text-[var(--text-ink)] leading-relaxed">
+            <p className="font-semibold text-[var(--flame-accent)]">Challenge In Progress</p>
+            <p className="mt-0.5 text-[var(--text-muted)]">
               The challenge has already started. Changing the duration, challenge name, or start date
               will immediately shift the active day index for all members and alter universal streak
               calculations.
@@ -160,10 +167,10 @@ export default function ScheduleSettingsCard({
 
       {/* Form */}
       <form onSubmit={handleSave} className="mt-4 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Duration Days */}
           <div>
-            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+            <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
               Challenge Duration (Days)
             </label>
             <input
@@ -173,16 +180,16 @@ export default function ScheduleSettingsCard({
               required
               value={durationDays}
               onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+              className="w-full px-3 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs"
             />
-            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
               e.g. 21, 40, or 90 days
             </p>
           </div>
 
           {/* Challenge Name */}
           <div>
-            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+            <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
               Challenge Theme Name
             </label>
             <input
@@ -191,38 +198,38 @@ export default function ScheduleSettingsCard({
               value={challengeName}
               onChange={(e) => setChallengeName(e.target.value)}
               placeholder="e.g. Overcomer, Purpose, Dominion"
-              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+              className="w-full px-3 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs"
             />
-            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
               Forms &quot;{durationDays} Days of {challengeName.trim() || '…'}&quot;
             </p>
           </div>
 
           {/* Start Date */}
           <div>
-            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+            <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
               Challenge Start Date
             </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+              className="w-full px-3 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs"
             />
-            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
               Determines Day 1 universal activation
             </p>
           </div>
 
           {/* Timezone */}
           <div>
-            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+            <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
               Fellowship Timezone
             </label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm cursor-pointer"
+              className="w-full px-3 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs cursor-pointer"
             >
               <option value="Africa/Lagos">
                 West Africa Time (WAT) - GMT+1 (Ile-Ife Local)
@@ -231,18 +238,18 @@ export default function ScheduleSettingsCard({
               <option value="Europe/London">London (GMT/BST)</option>
               <option value="America/New_York">New York (EST/EDT)</option>
             </select>
-            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
-              Synced to BBCC Ile-Ife Tabernacle
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              Synced to BBCC Ile-Ife Sanctuary
             </p>
           </div>
         </div>
 
         {msg && (
           <div
-            className={`text-xs px-3 py-2 rounded-xl font-medium ${
+            className={`text-xs px-3 py-2 rounded-lg font-medium ${
               msg.type === 'success'
-                ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                ? 'bg-green-500/10 text-[var(--olive-accent)] border border-green-500/25'
+                : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25'
             }`}
           >
             {msg.text}
@@ -250,13 +257,13 @@ export default function ScheduleSettingsCard({
         )}
 
         <div className="flex items-center justify-between pt-2">
-          <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-            Current layout: <strong className="text-gray-800 dark:text-zinc-200">{durationDays} total days</strong>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Current layout: <strong className="text-[var(--text-ink)] font-semibold">{durationDays} total days</strong>
           </p>
           <button
             type="submit"
             disabled={isPending}
-            className="px-4 py-2 bg-gray-950 dark:bg-zinc-800 hover:bg-gray-800 dark:hover:bg-zinc-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
+            className="px-4 py-2 bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 text-white font-medium text-xs rounded-lg shadow-xs transition cursor-pointer"
           >
             {isPending ? 'Saving…' : 'Save Challenge Settings'}
           </button>

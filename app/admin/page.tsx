@@ -1,5 +1,14 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import {
+  Eye,
+  ShieldCheck,
+  BarChart3,
+  Megaphone,
+  Users,
+  Flame,
+  Calendar,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
@@ -127,23 +136,23 @@ export default async function AdminPage() {
   })()
 
   return (
-    <main className="min-h-screen bg-[#F8F9FA] dark:bg-zinc-950 text-gray-900 dark:text-zinc-100 pb-20 transition-colors">
+    <main className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-ink)] pb-20 transition-colors">
       {/* ── Top Admin Bar ───────────────────────────────────── */}
-      <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 sticky top-0 z-40 transition-colors">
+      <header className="bg-[var(--bg-surface)] border-b border-[var(--border-hairline)] sticky top-0 z-40 transition-colors">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <BBCCLogo size="sm" />
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xs font-black text-gray-900 dark:text-zinc-100 leading-tight">
+                <h1 className="text-xs font-semibold text-[var(--text-ink)] leading-tight">
                   Believers&apos; Banquet Christian Centre
                 </h1>
-                <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold px-2 py-0.2 rounded-full border border-amber-200/50 dark:border-amber-900/40">
+                <span className="text-[10px] bg-[var(--bg-subtle)] text-[var(--flame-accent)] font-medium px-2 py-0.5 rounded-full border border-[var(--border-hairline)]">
                   Ile-Ife Assembly
                 </span>
               </div>
-              <p className="text-[10px] text-gray-400 dark:text-zinc-500">
-                BBCC {durationDays} Days of {challengeName} — Pastoral &amp; Admin Console
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                {durationDays} Days of {challengeName} — Pastoral Administration
               </p>
             </div>
           </div>
@@ -151,12 +160,14 @@ export default async function AdminPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/dashboard"
-              className="text-xs font-bold text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+              className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] border border-[var(--border-hairline)] px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition"
             >
-              👁️ Member View
+              <Eye size={13} strokeWidth={1.75} />
+              <span>Member View</span>
             </Link>
-            <div className="hidden sm:flex items-center gap-2 text-xs font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-200/50 dark:border-amber-900/40">
-              👑 {profile.full_name}
+            <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-[var(--bg-subtle)] text-[var(--text-ink)] px-2.5 py-1.5 rounded-lg border border-[var(--border-hairline)]">
+              <ShieldCheck size={13} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
+              <span>{profile.full_name}</span>
             </div>
             <ThemeToggle />
             <LogoutButton />
@@ -169,14 +180,14 @@ export default async function AdminPage() {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6">
           <div>
-            <span className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 text-xs font-bold px-2.5 py-0.5 rounded-full mb-1.5 border border-green-200/50 dark:border-green-800/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              Cohort 2025: Consecration &amp; Dominion
+            <span className="inline-flex items-center gap-1.5 bg-[var(--bg-subtle)] text-[var(--olive-accent)] text-xs font-medium px-2.5 py-0.5 rounded-full mb-1.5 border border-[var(--border-hairline)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--olive-accent)] inline-block" />
+              Corporate Consecration &amp; Dominion
             </span>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-zinc-50 tracking-tight">
+            <h2 className="text-xl font-semibold tracking-tight text-[var(--text-ink)]">
               Curriculum &amp; Fellowship Management
             </h2>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               Supervising devotional milestones, prayer adherence, and daily spiritual nourishment across Ile-Ife fellowships.
             </p>
           </div>
@@ -184,91 +195,93 @@ export default async function AdminPage() {
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
               type="button"
-              className="text-xs font-bold text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 px-3 py-2 rounded-xl shadow-sm transition"
+              className="text-xs font-medium text-[var(--text-ink)] bg-[var(--bg-surface)] border border-[var(--border-hairline)] hover:bg-[var(--bg-subtle)] px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
-              📊 Export Analytics
+              <BarChart3 size={13} strokeWidth={1.75} />
+              <span>Export Analytics</span>
             </button>
             <button
               type="button"
-              className="text-xs font-bold text-white bg-gray-950 dark:bg-zinc-800 hover:bg-gray-800 dark:hover:bg-zinc-700 px-3.5 py-2 rounded-xl shadow transition"
+              className="text-xs font-medium text-white bg-[var(--flame-accent)] hover:opacity-95 px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
-              📢 Broadcast Notice
+              <Megaphone size={13} strokeWidth={1.75} />
+              <span>Broadcast Notice</span>
             </button>
           </div>
         </div>
 
         {/* ── 4 Stat Summary Cards ────────────────────────────── */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Curriculum Readiness */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center justify-between transition-colors">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
             <div>
-              <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 Curriculum Readiness
               </p>
-              <p className="text-xl font-black text-gray-900 dark:text-zinc-100 mt-1">
-                {readyDaysCount} / {durationDays} <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Days</span>
+              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                {readyDaysCount} / {durationDays} <span className="text-xs font-normal text-[var(--text-muted)]">Days</span>
               </p>
-              <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold mt-0.5">
-                ✓ {readinessPct}% Complete ({Math.max(0, durationDays - readyDaysCount)} Remaining)
+              <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
+                {readinessPct}% Complete ({Math.max(0, durationDays - readyDaysCount)} Remaining)
               </p>
             </div>
-            <div className="w-11 h-11 rounded-full bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 flex items-center justify-center font-black text-amber-700 dark:text-amber-300 text-xs">
+            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-hairline)] flex items-center justify-center font-bold text-[var(--flame-accent)] text-xs">
               {readinessPct}%
             </div>
           </div>
 
           {/* Card 2: Active Members */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center justify-between transition-colors">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
             <div>
-              <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 Active Church Members
               </p>
-              <p className="text-xl font-black text-gray-900 dark:text-zinc-100 mt-1">
-                {totalEnrolled} <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Enrolled</span>
+              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                {totalEnrolled} <span className="text-xs font-normal text-[var(--text-muted)]">Enrolled</span>
               </p>
-              <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold mt-0.5">
-                ● {totalEnrolled} Active In Cohort
+              <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
+                All Active in Cohort
               </p>
             </div>
-            <div className="w-11 h-11 rounded-full bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center text-lg">
-              👥
+            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
+              <Users size={16} strokeWidth={1.75} />
             </div>
           </div>
 
           {/* Card 3: Collective Streak */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center justify-between transition-colors">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
             <div>
-              <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 Collective Church Streak
               </p>
-              <p className="text-xl font-black text-gray-900 dark:text-zinc-100 mt-1">
-                {avgStreak} <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Days Avg.</span>
+              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                {avgStreak} <span className="text-xs font-normal text-[var(--text-muted)]">Days Avg.</span>
               </p>
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                🔥 High Spiritual Adherence
+              <p className="text-[10px] text-[var(--flame-accent)] font-medium mt-0.5">
+                High Spiritual Adherence
               </p>
             </div>
-            <div className="w-11 h-11 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg">
-              ⚡
+            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center border border-[var(--border-hairline)]">
+              <Flame size={16} strokeWidth={1.75} />
             </div>
           </div>
 
           {/* Card 4: Challenge Timeline */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-zinc-800 flex items-center justify-between transition-colors">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
             <div>
-              <p className="text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                 Challenge Timeline
               </p>
-              <p className="text-xl font-black text-gray-900 dark:text-zinc-100 mt-1">
+              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
                 Day {currentDay > 0 ? currentDay : 0}{' '}
-                <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">of {durationDays}</span>
+                <span className="text-xs font-normal text-[var(--text-muted)]">of {durationDays}</span>
               </p>
-              <p className="text-[10px] text-gray-400 dark:text-zinc-500 font-semibold mt-0.5">
+              <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
                 Ends {endDateStr}
               </p>
             </div>
-            <div className="w-11 h-11 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg">
-              📅
+            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
+              <Calendar size={16} strokeWidth={1.75} />
             </div>
           </div>
         </section>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { Sparkles, MessageSquare, Send, Trash2, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { postMessage, deleteMessage } from '@/lib/actions/messages'
 import UserAvatar from '@/components/UserAvatar'
@@ -43,7 +44,7 @@ function formatTime(isoString: string): string {
 
     if (isToday) return timeStr
     if (isYesterday) return `Yesterday ${timeStr}`
-    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} · ${timeStr}`
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} / ${timeStr}`
   } catch {
     return ''
   }
@@ -269,19 +270,19 @@ export default function CommunityChat({
   const charsLeft = 500 - text.length
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-[var(--bg-canvas)] text-[var(--text-ink)]">
       {/* ── Top App Bar ────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-[#FAF6EC]/90 dark:bg-zinc-950/90 backdrop-blur-md px-4 pt-4 pb-3 border-b border-amber-200/50 dark:border-zinc-800 transition-colors">
+      <header className="sticky top-0 z-30 bg-[var(--bg-canvas)]/90 backdrop-blur-md px-4 pt-4 pb-3 border-b border-[var(--border-hairline)] transition-colors">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <BBCCLogo size="sm" />
             <div className="leading-tight">
-              <h1 className="text-sm font-black text-gray-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <h1 className="text-sm font-semibold tracking-tight text-[var(--text-ink)] flex items-center gap-1.5">
                 Fellowship Wall
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--olive-accent)] inline-block" />
               </h1>
-              <p className="text-[10px] text-gray-500 dark:text-zinc-400">
-                Day {currentDay > 0 ? currentDay : 1} of {durationDays} · Corporate Encouragement
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Day {currentDay > 0 ? currentDay : 1} of {durationDays} / Corporate Encouragement
               </p>
             </div>
           </div>
@@ -290,7 +291,7 @@ export default function CommunityChat({
             <ThemeToggle />
             <Link
               href="/dashboard"
-              className="text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-950/50 hover:bg-amber-200/80 px-2.5 py-1 rounded-lg transition"
+              className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-surface)] border border-[var(--border-hairline)] px-2.5 py-1 rounded-lg transition"
             >
               Today
             </Link>
@@ -300,14 +301,16 @@ export default function CommunityChat({
 
       {/* ── Fellowship Scripture / Welcome Prompt ─────────────── */}
       <div className="px-4 pt-3 pb-1">
-        <div className="bg-white/80 dark:bg-zinc-900/80 rounded-xl p-2.5 border border-amber-200/60 dark:border-zinc-800 flex items-center justify-between text-xs text-gray-600 dark:text-zinc-300 shadow-xs">
+        <div className="bg-[var(--bg-surface)] rounded-xl p-3 border border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-muted)] shadow-xs">
           <div className="flex items-center gap-2">
-            <span className="text-base">🕊️</span>
+            <span className="text-[var(--flame-accent)] shrink-0">
+              <Sparkles size={14} strokeWidth={1.75} />
+            </span>
             <span className="text-[11px] leading-tight">
-              <strong className="text-amber-700 dark:text-amber-400">1 Thess. 5:11:</strong> &ldquo;Encourage one another and build each other up.&rdquo;
+              <strong className="text-[var(--text-ink)] font-semibold">1 Thess. 5:11:</strong> &ldquo;Encourage one another and build each other up.&rdquo;
             </span>
           </div>
-          <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 shrink-0 ml-2">
+          <span className="text-[10px] font-medium text-[var(--text-muted)] shrink-0 ml-2">
             {messages.length} {messages.length === 1 ? 'msg' : 'msgs'}
           </span>
         </div>
@@ -315,7 +318,7 @@ export default function CommunityChat({
 
       {/* ── Error Banner ───────────────────────────────────────── */}
       {errorMsg && (
-        <div className="mx-4 mt-2 p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-center justify-between">
+        <div className="mx-4 mt-2 p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between">
           <span>{errorMsg}</span>
           <button
             type="button"
@@ -328,17 +331,17 @@ export default function CommunityChat({
       )}
 
       {/* ── Messages Feed (Scrollable) ────────────────────────── */}
-      <div className="flex-1 px-4 py-3 space-y-3.5 pb-36">
+      <div className="flex-1 px-4 py-3 space-y-3 pb-36">
         {messages.length === 0 ? (
-          <div className="my-12 text-center py-10 px-6 bg-white dark:bg-zinc-900 rounded-3xl border border-dashed border-amber-200 dark:border-zinc-800 shadow-xs">
-            <div className="w-14 h-14 mx-auto rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl mb-3">
-              💬
+          <div className="my-12 text-center py-10 px-6 bg-[var(--bg-surface)] rounded-2xl border border-dashed border-[var(--border-hairline)] shadow-xs">
+            <div className="w-10 h-10 mx-auto rounded-full bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center mb-2.5 border border-[var(--border-hairline)]">
+              <MessageSquare size={18} strokeWidth={1.75} />
             </div>
-            <h2 className="text-sm font-black text-gray-900 dark:text-zinc-100">
-              Welcome to the Fellowship Wall!
+            <h2 className="text-sm font-semibold text-[var(--text-ink)]">
+              Welcome to the Fellowship Wall
             </h2>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5 leading-relaxed max-w-xs mx-auto">
-              No messages yet. Share a prayer request, testimony, or note of encouragement with the brethren as we journey through the {durationDays} days together.
+            <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed max-w-xs mx-auto">
+              Share a prayer request, testimony, or note of spiritual encouragement as we journey through the {durationDays} days together.
             </p>
           </div>
         ) : (
@@ -371,17 +374,17 @@ export default function CommunityChat({
                   {/* Sender Name & Details Header */}
                   {!isOwn && (
                     <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <span className="text-xs font-bold text-gray-900 dark:text-zinc-100">
+                      <span className="text-xs font-semibold text-[var(--text-ink)]">
                         {senderName}
                       </span>
                       {isSenderAdmin && (
-                        <span className="text-[9px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.2 rounded">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
                           Pastor / Admin
                         </span>
                       )}
                       {senderUnit && !isSenderAdmin && (
-                        <span className="text-[10px] text-gray-400 dark:text-zinc-500 truncate max-w-[130px]">
-                          · {senderUnit}
+                        <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[130px]">
+                          / {senderUnit}
                         </span>
                       )}
                     </div>
@@ -391,8 +394,8 @@ export default function CommunityChat({
                   <div
                     className={`relative px-3.5 py-2.5 rounded-2xl text-xs break-words shadow-xs transition-colors ${
                       isOwn
-                        ? 'bg-amber-500 text-white rounded-br-xs'
-                        : 'bg-white dark:bg-zinc-800/90 text-gray-900 dark:text-zinc-100 border border-gray-200/80 dark:border-zinc-700/80 rounded-bl-xs'
+                        ? 'bg-[var(--flame-accent)] text-white rounded-br-xs'
+                        : 'bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-bl-xs'
                     }`}
                   >
                     <p className="whitespace-pre-wrap leading-relaxed select-text font-normal">
@@ -403,8 +406,8 @@ export default function CommunityChat({
                     <div
                       className={`flex items-center justify-end gap-2 mt-1.5 text-[10px] ${
                         isOwn
-                          ? 'text-amber-100'
-                          : 'text-gray-400 dark:text-zinc-500'
+                          ? 'text-white/80'
+                          : 'text-[var(--text-muted)]'
                       }`}
                     >
                       <span>{formatTime(msg.created_at)}</span>
@@ -417,16 +420,14 @@ export default function CommunityChat({
                           title={isAdmin && !isOwn ? 'Admin Moderation: Delete message' : 'Delete my message'}
                           className={`opacity-70 hover:opacity-100 transition p-0.5 rounded cursor-pointer ${
                             isOwn
-                              ? 'text-amber-200 hover:text-white'
-                              : 'text-red-500 hover:text-red-700'
+                              ? 'text-white/80 hover:text-white'
+                              : 'text-red-500 hover:text-red-600'
                           }`}
                         >
                           {deletingId === msg.id ? (
-                            <span className="inline-block animate-spin text-[10px]">⌛</span>
+                            <Loader2 size={12} className="animate-spin" />
                           ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <Trash2 size={12} strokeWidth={1.75} />
                           )}
                         </button>
                       )}
@@ -452,7 +453,7 @@ export default function CommunityChat({
       </div>
 
       {/* ── Fixed Chat Input Bar (Above BottomNav) ────────────── */}
-      <div className="fixed bottom-[56px] left-0 right-0 z-40 bg-[#FAF6EC]/95 dark:bg-zinc-950/95 backdrop-blur-md border-t border-amber-200/60 dark:border-zinc-800 transition-colors">
+      <div className="fixed bottom-[56px] left-0 right-0 z-40 bg-[var(--bg-canvas)]/95 backdrop-blur-md border-t border-[var(--border-hairline)] transition-colors">
         <form
           onSubmit={handleSend}
           className="max-w-md mx-auto px-4 py-2.5 flex items-end gap-2"
@@ -466,12 +467,12 @@ export default function CommunityChat({
               placeholder="Share a word, prayer, or testimony..."
               maxLength={500}
               rows={1}
-              className="w-full resize-none rounded-2xl bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 px-3.5 py-2 text-xs text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all shadow-xs leading-normal max-h-32"
+              className="w-full resize-none rounded-xl bg-[var(--bg-surface)] border border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-ink)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition-all shadow-xs leading-normal max-h-32"
             />
             {text.length > 350 && (
               <span
-                className={`absolute right-2.5 bottom-1 text-[9px] font-bold ${
-                  charsLeft < 20 ? 'text-red-500' : 'text-gray-400 dark:text-zinc-500'
+                className={`absolute right-2.5 bottom-1 text-[9px] font-medium ${
+                  charsLeft < 20 ? 'text-red-500' : 'text-[var(--text-muted)]'
                 }`}
               >
                 {charsLeft}
@@ -482,20 +483,18 @@ export default function CommunityChat({
           <button
             type="submit"
             disabled={!text.trim() || isSubmitting || text.length > 500}
-            className={`h-9 px-4 rounded-2xl flex items-center justify-center font-bold text-xs transition shadow-sm shrink-0 cursor-pointer ${
+            className={`h-8.5 px-3.5 rounded-xl flex items-center justify-center font-medium text-xs transition shadow-xs shrink-0 cursor-pointer ${
               !text.trim() || isSubmitting || text.length > 500
-                ? 'bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-600 cursor-not-allowed'
-                : 'bg-amber-500 hover:bg-amber-600 text-gray-950 active:scale-95'
+                ? 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-hairline)] cursor-not-allowed'
+                : 'bg-[var(--flame-accent)] hover:opacity-95 text-white active:scale-95'
             }`}
           >
             {isSubmitting ? (
-              <span className="w-4 h-4 border-2 border-gray-950 border-t-transparent rounded-full animate-spin" />
+              <Loader2 size={14} className="animate-spin text-white" />
             ) : (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5">
                 <span>Send</span>
-                <svg className="w-3.5 h-3.5 rotate-45 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
+                <Send size={12} strokeWidth={1.75} />
               </span>
             )}
           </button>
@@ -504,3 +503,4 @@ export default function CommunityChat({
     </div>
   )
 }
+

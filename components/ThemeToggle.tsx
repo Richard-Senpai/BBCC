@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Sun, Moon } from 'lucide-react'
 
 export default function ThemeToggle({ className = '' }: { className?: string }) {
   const [isDark, setIsDark] = useState<boolean>(false)
@@ -38,7 +39,7 @@ export default function ThemeToggle({ className = '' }: { className?: string }) 
   if (!mounted) {
     return (
       <div
-        className={`w-8 h-8 rounded-xl bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 ${className}`}
+        className={`w-8 h-8 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] ${className}`}
       />
     )
   }
@@ -50,24 +51,18 @@ export default function ThemeToggle({ className = '' }: { className?: string }) 
       title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
       aria-label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
       className={`
-        w-8 h-8 rounded-xl flex items-center justify-center text-sm
-        transition-all duration-200 shadow-sm
-        ${
-          isDark
-            ? 'bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700'
-            : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
-        }
+        w-8 h-8 rounded-xl flex items-center justify-center
+        bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)]
+        text-[var(--text-muted)] hover:text-[var(--text-ink)]
+        border border-[var(--border-subtle)]
+        transition-colors shadow-2xs
         ${className}
       `}
     >
       {isDark ? (
-        <span role="img" aria-label="Sun">
-          ☀️
-        </span>
+        <Sun size={15} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
       ) : (
-        <span role="img" aria-label="Moon">
-          🌙
-        </span>
+        <Moon size={15} strokeWidth={1.75} className="text-[var(--text-muted)]" />
       )}
     </button>
   )

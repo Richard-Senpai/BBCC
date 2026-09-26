@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import ActivityChecklist from '@/components/dashboard/ActivityChecklist'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
+import { Flame, BookOpen, Sparkles, Hourglass, Trophy, Users } from 'lucide-react'
 import type {
   Profile,
   ChallengeSettings,
@@ -76,18 +77,19 @@ function NotStartedView({
 }) {
   const firstName = profile.full_name.split(' ')[0]
   return (
-    <div className="px-4 py-12 text-center">
-      <div className="text-6xl mb-4">⏳</div>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-2">
-        Challenge not started yet
+    <div className="px-4 py-16 text-center">
+      <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--flame-accent)] shadow-2xs">
+        <Hourglass size={24} strokeWidth={1.75} />
+      </div>
+      <h1 className="text-xl font-bold text-[var(--text-ink)] mb-2 font-serif">
+        Consecration Begins Soon
       </h1>
-      <p className="text-gray-500 dark:text-zinc-400 text-sm mb-1">
-        Welcome, {firstName}! The {durationDays} Days of {challengeName} will begin once your
-        pastor sets the start date.
+      <p className="text-[var(--text-muted)] text-sm max-w-xs mx-auto leading-relaxed">
+        Welcome, {firstName}. The {durationDays} Days of {challengeName} will commence as designated by pastoral leadership.
       </p>
       {settings?.start_date && (
-        <p className="text-amber-700 dark:text-amber-400 font-semibold text-sm mt-3">
-          Starting:{' '}
+        <p className="text-[var(--flame-accent)] font-semibold text-xs mt-4">
+          Starting on{' '}
           {new Date(settings.start_date).toLocaleDateString('en-NG', {
             weekday: 'long',
             year: 'numeric',
@@ -111,14 +113,15 @@ function CompletedView({
 }) {
   const firstName = profile.full_name.split(' ')[0]
   return (
-    <div className="px-4 py-12 text-center">
-      <div className="text-6xl mb-4">🏆</div>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-2">
-        Glory to God, {firstName}!
+    <div className="px-4 py-16 text-center">
+      <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[var(--covenant-subtle)] border border-[var(--covenant-accent)]/30 flex items-center justify-center text-[var(--covenant-accent)] shadow-2xs">
+        <Trophy size={24} strokeWidth={1.75} />
+      </div>
+      <h1 className="text-xl font-bold text-[var(--text-ink)] mb-2 font-serif">
+        Glory to God, {firstName}
       </h1>
-      <p className="text-gray-600 dark:text-zinc-400 text-sm">
-        You have completed the {durationDays} Days of {challengeName} Challenge. Your certificate
-        of consecration will be issued soon.
+      <p className="text-[var(--text-muted)] text-sm max-w-xs mx-auto leading-relaxed">
+        You have completed the full course of the {durationDays} Days of {challengeName} Challenge. May the grace of consecration remain steadfast.
       </p>
     </div>
   )
@@ -263,99 +266,89 @@ export default async function DashboardPage() {
       <DashboardHeader profile={profile} streak={stats.current_streak} challengeTitle={challengeTitle} />
 
       {/* ── Greeting with Avatar ────────────────────────────── */}
-      <section className="px-4 mt-3">
-        <div className="flex items-center gap-3">
+      <section className="px-4 mt-2">
+        <div className="flex items-center gap-3 py-2">
           <UserAvatar
             avatarUrl={profile.avatar_url}
             name={profile.full_name}
-            size="lg"
+            size="md"
           />
           <div className="min-w-0 flex-1">
             {profile.fellowship_unit && (
-              <p className="text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-1 mb-0.5 truncate">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                {profile.fellowship_unit.toUpperCase()}
+              <p className="text-[11px] font-semibold text-[var(--covenant-accent)] tracking-tight truncate">
+                {profile.fellowship_unit}
               </p>
             )}
-            <h1 className="text-xl font-black text-gray-950 dark:text-zinc-50 leading-tight truncate">
-              {greeting}, {firstName}{' '}
-              <span aria-hidden="true">
-                {greeting.startsWith('Good m') ? '☀️' : greeting.startsWith('Good a') ? '🌤️' : '🌙'}
-              </span>
+            <h1 className="text-lg font-bold text-[var(--text-ink)] leading-snug truncate font-serif">
+              {greeting}, {firstName}
             </h1>
           </div>
         </div>
       </section>
 
       {/* ── Progress bar ────────────────────────────────────── */}
-      <section className="px-4 mt-3.5">
-        <div className="flex items-center justify-between text-sm font-semibold mb-1.5">
-          <span className="text-gray-800 dark:text-zinc-200">
-            Day <span className="text-amber-600 dark:text-amber-400">{currentDay}</span> of {durationDays}
-          </span>
-          <span className="text-amber-600 dark:text-amber-400">{pct}% Completed</span>
-        </div>
-        <div className="h-2 rounded-full bg-gray-200 dark:bg-zinc-800 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-amber-500 transition-all duration-700"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5 flex items-center gap-1 flex-wrap">
-          <span>{stats.total_completed} of {durationDays} days completed</span>
-          {nextMilestone && (
-            <>
-              <span>·</span>
-              <span className="text-amber-600 dark:text-amber-400 font-medium">
-                ⚡ Milestone: Day {nextMilestone.day} in{' '}
-                {nextMilestone.daysLeft}{' '}
-                {nextMilestone.daysLeft === 1 ? 'day' : 'days'}
+      <section className="px-4 mt-2">
+        <div className="bg-[var(--bg-surface)] rounded-2xl p-4 border border-[var(--border-subtle)] transition-colors">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-[var(--text-muted)]">
+              Day <strong className="text-[var(--text-ink)] font-bold">{currentDay}</strong> of {durationDays}
+            </span>
+            <span className="font-semibold text-[var(--flame-accent)]">{pct}% completed</span>
+          </div>
+          <div className="h-2 rounded-full bg-[var(--bg-subtle)] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[var(--flame-accent)] transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+            <span>{stats.total_completed} of {durationDays} days completed</span>
+            {nextMilestone && (
+              <span className="text-[var(--flame-accent)] font-medium flex items-center gap-1">
+                <Sparkles size={11} strokeWidth={2} />
+                Day {nextMilestone.day} ({nextMilestone.daysLeft}d left)
               </span>
-            </>
-          )}
-        </p>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* ── Today's Devotion card ────────────────────────────── */}
-      <section className="px-4 mt-4">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 overflow-hidden transition-colors">
+      <section className="px-4 mt-3">
+        <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-colors">
           {/* Card header */}
-          <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-zinc-800">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest">
-                  Today&apos;s Devotion
-                </span>
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                  {dayOfWeek} Consecration
-                </p>
-              </div>
-              <div className="text-xs text-gray-500 dark:text-zinc-400 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full font-medium">
+          <div className="px-4 pt-4 pb-3.5 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-[var(--flame-accent)]">
+                Today&apos;s Devotional Focus
+              </span>
+              <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)]">
                 Day {currentDay}
-              </div>
+              </span>
             </div>
 
             {todayChallenge ? (
               <>
-                <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100 mt-2 leading-snug">
+                <h2 className="text-base font-bold text-[var(--text-ink)] leading-snug font-serif">
                   {todayChallenge.title}
                 </h2>
                 {todayChallenge.scripture_reference && (
-                  <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1 flex items-center gap-1">
-                    <span>📖</span> {todayChallenge.scripture_reference}
+                  <p className="text-xs text-[var(--flame-accent)] font-serif italic mt-1 flex items-center gap-1.5">
+                    <BookOpen size={13} strokeWidth={1.75} className="shrink-0" />
+                    <span>{todayChallenge.scripture_reference}</span>
                   </p>
                 )}
                 {todayChallenge.description && (
-                  <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-xl p-3">
-                    <p className="text-xs text-gray-700 dark:text-zinc-300 leading-relaxed italic">
+                  <div className="mt-2.5 bg-[var(--bg-subtle)] border-l-2 border-[var(--flame-accent)] rounded-r-xl p-3">
+                    <p className="text-xs text-[var(--text-ink)]/90 leading-relaxed font-serif italic">
                       &ldquo;{todayChallenge.description}&rdquo;
                     </p>
                   </div>
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-400 dark:text-zinc-500 italic mt-2">
-                Content for Day {currentDay} is being prepared — check back soon.
+              <p className="text-sm text-[var(--text-muted)] italic mt-2">
+                Content for Day {currentDay} is being prepared by church pastoral leadership.
               </p>
             )}
           </div>
@@ -373,8 +366,8 @@ export default async function DashboardPage() {
                 isToday={true}
               />
             ) : (
-              <p className="text-sm text-gray-400 dark:text-zinc-500 text-center py-4">
-                Activities for Day {currentDay} will appear here.
+              <p className="text-sm text-[var(--text-muted)] text-center py-4">
+                Disciplines for Day {currentDay} will appear here.
               </p>
             )}
           </div>
@@ -382,7 +375,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* ── Consecration Matrix ────────────────────────────── */}
-      <section className="px-4 mt-4">
+      <section className="px-4 mt-3">
         <ConsecrationMatrix
           currentDay={currentDay}
           completedDayNumbers={completedDayNumbers}
@@ -392,22 +385,25 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* ── Prayer Chain banner ─────────────────────────────── */}
-      <section className="px-4 mt-4">
-        <div className="bg-amber-950 dark:bg-zinc-900 border border-amber-900 dark:border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
+      {/* ── Corporate Prayer Watch Banner ───────────────────── */}
+      <section className="px-4 mt-3">
+        <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-4 flex items-center justify-between transition-colors">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-amber-800 dark:bg-amber-950 flex items-center justify-center">
-              <span className="text-sm">🙏</span>
+            <div className="w-9 h-9 rounded-xl bg-[var(--covenant-subtle)] border border-[var(--covenant-accent)]/20 flex items-center justify-center text-[var(--covenant-accent)] shrink-0">
+              <Users size={16} strokeWidth={1.75} />
             </div>
             <div>
-              <p className="text-xs font-bold text-white">Prayer Chain Active</p>
-              <p className="text-[10px] text-amber-300 dark:text-amber-400">
-                Believers praying in unity now
+              <p className="text-xs font-bold text-[var(--text-ink)]">Corporate Prayer Watch</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                Believers praying in agreement across Ile-Ife
               </p>
             </div>
           </div>
-          <button className="text-xs font-bold text-amber-400 bg-amber-900/80 dark:bg-zinc-800 px-3 py-1.5 rounded-lg border border-amber-700/50 dark:border-zinc-700">
-            Join · Watch
+          <button
+            type="button"
+            className="text-xs font-semibold text-[var(--covenant-accent)] bg-[var(--covenant-subtle)] hover:bg-[var(--covenant-accent)] hover:text-white px-3 py-1.5 rounded-lg border border-[var(--covenant-accent)]/25 transition-colors"
+          >
+            Join Watch
           </button>
         </div>
       </section>
@@ -430,19 +426,20 @@ function DashboardHeader({
   return (
     <header className="px-4 pt-5 pb-2 flex items-center justify-between">
       {/* Left: logo + app name */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <BBCCLogo size="sm" />
         <div className="leading-tight">
-          <p className="text-xs font-black text-gray-900 dark:text-zinc-100">{challengeTitle ?? 'BBCC Consecration'}</p>
-          <p className="text-[10px] text-gray-500 dark:text-zinc-400">Believers&apos; Banquet</p>
+          <p className="text-xs font-bold text-[var(--text-ink)] tracking-tight">{challengeTitle ?? 'BBCC Consecration'}</p>
+          <p className="text-[10px] text-[var(--text-muted)]">Believers&apos; Banquet</p>
         </div>
       </div>
 
       {/* Right: streak pill + theme toggle + sign-out */}
       <div className="flex items-center gap-2">
         {streak > 0 && (
-          <div className="flex items-center gap-1 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm shadow-amber-500/20">
-            🔥 {streak} {streak === 1 ? 'Day' : 'Days'}
+          <div className="flex items-center gap-1.5 bg-[var(--flame-subtle)] text-[var(--flame-accent)] border border-[var(--flame-accent)]/25 text-xs font-bold px-2.5 py-1 rounded-full">
+            <Flame size={13} strokeWidth={2.2} className="text-[var(--flame-accent)]" />
+            <span>{streak} {streak === 1 ? 'Day' : 'Days'}</span>
           </div>
         )}
         <ThemeToggle />

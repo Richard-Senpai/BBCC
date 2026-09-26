@@ -1,8 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import {
+  User,
+  Mail,
+  Phone,
+  Users,
+  Lock,
+  Eye,
+  EyeOff,
+  HelpCircle,
+  PhoneCall,
+  Flame,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
@@ -125,11 +136,11 @@ export default function SignupPage() {
     } = await supabase.auth.getUser()
 
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile } = (await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .single() as { data: { role: string } | null; error: unknown }
+        .single()) as { data: { role: string } | null; error: unknown }
 
       router.push(profile?.role === 'admin' ? '/admin' : '/dashboard')
       router.refresh()
@@ -140,20 +151,25 @@ export default function SignupPage() {
   // ── Email sent confirmation ────────────────────────────────
   if (emailSent) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-[#FAF6EC] dark:bg-zinc-950 transition-colors">
-        <div className="w-full max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-md p-8 text-center">
-          <div className="text-4xl mb-4">📧</div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 mb-2">
+      <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-[var(--bg-canvas)] text-[var(--text-ink)] transition-colors">
+        <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-2xl shadow-xs p-8 text-center">
+          <div className="w-12 h-12 mx-auto rounded-full bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center mb-4 border border-[var(--border-hairline)]">
+            <Mail size={22} strokeWidth={1.75} />
+          </div>
+          <h2 className="text-base font-semibold text-[var(--text-ink)] mb-2">
             Check your email
           </h2>
-          <p className="text-gray-600 dark:text-zinc-400 text-sm">
+          <p className="text-[var(--text-muted)] text-xs leading-relaxed">
             We sent a confirmation link to{' '}
-            <span className="font-semibold text-amber-600 dark:text-amber-400">{email}</span>.
-            Click it to activate your account and join the challenge!
+            <span className="font-semibold text-[var(--flame-accent)]">{email}</span>.
+            Click it to activate your account and join the corporate consecration.
           </p>
           <button
-            onClick={() => { setEmailSent(false); setTab('login') }}
-            className="mt-6 text-sm text-amber-700 dark:text-amber-400 font-semibold hover:underline"
+            onClick={() => {
+              setEmailSent(false)
+              setTab('login')
+            }}
+            className="mt-6 text-xs text-[var(--flame-accent)] font-medium hover:underline cursor-pointer"
           >
             Back to Sign In
           </button>
@@ -163,7 +179,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-[#FAF6EC] dark:bg-zinc-950 transition-colors relative">
+    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-[var(--bg-canvas)] text-[var(--text-ink)] transition-colors relative">
       {/* Top right theme toggle */}
       <div className="absolute top-4 right-4">
         <ThemeToggle />
@@ -172,26 +188,29 @@ export default function SignupPage() {
       {/* Church branding */}
       <div className="mb-6 text-center">
         <BBCCLogo size="lg" className="mx-auto mb-3" />
-        <h1 className="text-xl font-black text-gray-900 dark:text-zinc-100">
+        <h1 className="text-base font-semibold tracking-tight text-[var(--text-ink)]">
           Believers&apos; Banquet Christian Centre
         </h1>
-        <p className="text-amber-600 dark:text-amber-400 text-sm font-semibold mt-0.5">
+        <p className="text-[var(--flame-accent)] text-xs font-medium mt-0.5">
           {challengeBranding.duration_days} Days of {challengeBranding.challenge_name}
         </p>
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-md overflow-hidden transition-colors">
+      <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-2xl shadow-xs overflow-hidden transition-colors">
         {/* Tab toggle */}
-        <div className="flex bg-gray-100 dark:bg-zinc-800/80 m-3 rounded-xl p-1">
+        <div className="flex bg-[var(--bg-subtle)] m-3 rounded-xl p-1 border border-[var(--border-hairline)]">
           {(['register', 'login'] as const).map((t) => (
             <button
               key={t}
-              onClick={() => { setTab(t); setError(null) }}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+              onClick={() => {
+                setTab(t)
+                setError(null)
+              }}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 tab === t
-                  ? 'bg-white dark:bg-zinc-700 text-amber-600 dark:text-amber-400 shadow-sm'
-                  : 'text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-ink)] shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-ink)]'
               }`}
             >
               {t === 'register' ? 'Register' : 'Sign In'}
@@ -202,62 +221,76 @@ export default function SignupPage() {
         <div className="px-5 pb-5">
           {/* ── REGISTER FORM ─────────────────────────────── */}
           {tab === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-3.5">
-              <Field label="Full Name" icon="👤">
+            <form onSubmit={handleRegister} className="space-y-3">
+              <Field label="Full Name" icon={<User size={13} strokeWidth={1.75} />}>
                 <input
-                  type="text" required autoComplete="name"
-                  value={fullName} onChange={(e) => setFullName(e.target.value)}
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. David Oluwaseun"
                   className={inputCls}
                 />
               </Field>
 
-              <Field label="Email Address" icon="✉️">
+              <Field label="Email Address" icon={<Mail size={13} strokeWidth={1.75} />}>
                 <input
-                  type="email" required autoComplete="email"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="member@bbcc.org.ng"
                   className={inputCls}
                 />
               </Field>
 
-              <Field label="WhatsApp Phone Number" icon="📞">
+              <Field label="WhatsApp Phone Number" icon={<Phone size={13} strokeWidth={1.75} />}>
                 <input
-                  type="tel" autoComplete="tel"
-                  value={phone} onChange={(e) => setPhone(e.target.value)}
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   placeholder="+234 803 000 0000"
                   className={inputCls}
                 />
               </Field>
 
-              <Field label="Fellowship Unit" icon="👥">
+              <Field label="Fellowship Unit" icon={<Users size={13} strokeWidth={1.75} />}>
                 <select
-                  value={fellowship} onChange={(e) => setFellowship(e.target.value)}
+                  value={fellowship}
+                  onChange={(e) => setFellowship(e.target.value)}
                   className={`${inputCls} cursor-pointer`}
                 >
                   <option value="">Select your church unit…</option>
                   {FELLOWSHIP_UNITS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
                   ))}
                 </select>
               </Field>
 
-              <Field label="Password" icon="🔒">
+              <Field label="Password" icon={<Lock size={13} strokeWidth={1.75} />}>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    required autoComplete="new-password" minLength={8}
-                    value={password} onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="Minimum 8 characters"
-                    className={`${inputCls} pr-10`}
+                    className={`${inputCls} pr-9`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-ink)]"
                     tabIndex={-1}
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </Field>
@@ -265,35 +298,46 @@ export default function SignupPage() {
               {error && <ErrorMsg msg={error} />}
 
               <button
-                type="submit" disabled={loading}
-                className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 dark:disabled:bg-amber-800 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition"
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 text-white font-medium rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                🚩 {loading ? 'Creating account…' : `Enlist for ${challengeBranding.duration_days} Days of ${challengeBranding.challenge_name}`}
+                <Flame size={13} strokeWidth={1.75} />
+                <span>
+                  {loading
+                    ? 'Creating account…'
+                    : `Enlist for ${challengeBranding.duration_days} Days of ${challengeBranding.challenge_name}`}
+                </span>
               </button>
 
-              <p className="text-[10px] text-gray-400 dark:text-zinc-500 text-center">
-                By joining, you commit to daily personal consecration and
-                fellowship accountability.
+              <p className="text-[10px] text-[var(--text-muted)] text-center">
+                By joining, you commit to daily personal consecration and fellowship accountability.
               </p>
             </form>
           )}
 
           {/* ── LOGIN FORM ────────────────────────────────── */}
           {tab === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-3.5">
-              <Field label="Email Address" icon="✉️">
+            <form onSubmit={handleLogin} className="space-y-3">
+              <Field label="Email Address" icon={<Mail size={13} strokeWidth={1.75} />}>
                 <input
-                  type="email" required autoComplete="email"
-                  value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="member@bbcc.org.ng"
                   className={inputCls}
                 />
               </Field>
 
-              <Field label="Password" icon="🔒">
+              <Field label="Password" icon={<Lock size={13} strokeWidth={1.75} />}>
                 <input
-                  type="password" required autoComplete="current-password"
-                  value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
                   placeholder="Your password"
                   className={inputCls}
                 />
@@ -302,8 +346,9 @@ export default function SignupPage() {
               {error && <ErrorMsg msg={error} />}
 
               <button
-                type="submit" disabled={loading}
-                className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 dark:disabled:bg-amber-800 text-white font-black rounded-xl text-sm shadow-md shadow-amber-500/20 transition"
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 text-white font-medium rounded-xl text-xs transition cursor-pointer"
               >
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
@@ -311,12 +356,14 @@ export default function SignupPage() {
           )}
 
           {/* Help links */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
-            <button className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 hover:text-gray-800 dark:hover:text-zinc-200">
-              ❓ Need Help?
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-hairline)]">
+            <button className="text-[11px] text-[var(--text-muted)] flex items-center gap-1 hover:text-[var(--text-ink)] cursor-pointer">
+              <HelpCircle size={12} strokeWidth={1.75} />
+              <span>Need Help?</span>
             </button>
-            <button className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 hover:underline font-medium">
-              📞 Contact Church Office
+            <button className="text-[11px] text-[var(--flame-accent)] flex items-center gap-1 hover:underline font-medium cursor-pointer">
+              <PhoneCall size={12} strokeWidth={1.75} />
+              <span>Church Office</span>
             </button>
           </div>
         </div>
@@ -324,15 +371,12 @@ export default function SignupPage() {
 
       {/* Footer */}
       <div className="mt-8 text-center">
-        <p className="text-xs text-gray-700 dark:text-zinc-300 font-semibold">
+        <p className="text-xs text-[var(--text-ink)] font-medium">
           Believers&apos; Banquet Christian Centre
         </p>
-        <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-0.5">
+        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
           Campus &amp; City Sanctuary, Ile-Ife, Osun State
         </p>
-        <button className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 hover:underline">
-          🌐 Direct Line: Pastoral Helpdesk
-        </button>
       </div>
     </main>
   )
@@ -340,21 +384,26 @@ export default function SignupPage() {
 
 // ── Accessible High-Contrast Form Inputs ────────────────────────
 const inputCls =
-  'w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ' +
-  'bg-white text-gray-950 placeholder:text-gray-400 border border-gray-300 ' +
-  'dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:border-zinc-700 ' +
-  'focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:focus:ring-amber-400 ' +
-  'shadow-sm'
+  'w-full px-3 py-2 rounded-xl text-xs font-medium transition-all ' +
+  'bg-[var(--bg-surface)] text-[var(--text-ink)] placeholder:text-[var(--text-muted)] ' +
+  'border border-[var(--border-hairline)] ' +
+  'focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] ' +
+  'shadow-xs'
 
 function Field({
-  label, icon, children,
+  label,
+  icon,
+  children,
 }: {
-  label: string; icon: string; children: React.ReactNode
+  label: string
+  icon: React.ReactNode
+  children: React.ReactNode
 }) {
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
-        <span>{icon}</span> {label}
+      <label className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-ink)] mb-1">
+        <span className="text-[var(--text-muted)]">{icon}</span>
+        <span>{label}</span>
       </label>
       {children}
     </div>
@@ -363,7 +412,7 @@ function Field({
 
 function ErrorMsg({ msg }: { msg: string }) {
   return (
-    <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 px-3 py-2 rounded-xl">
+    <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/25 px-3 py-2 rounded-xl">
       {msg}
     </p>
   )

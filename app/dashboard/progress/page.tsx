@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
+import { Flame, TrendingUp, CheckCheck, Award, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
-import type { Profile, MemberStats } from '@/lib/types'
+import type { MemberStats } from '@/lib/types'
 
 export default async function ProgressPage() {
   const supabase = await createClient()
@@ -71,11 +72,11 @@ export default async function ProgressPage() {
         <div className="flex items-center gap-3">
           <BBCCLogo size="sm" />
           <div>
-            <h1 className="text-base font-black text-gray-900 dark:text-zinc-100">
-              My Progress
+            <h1 className="text-sm font-semibold tracking-tight text-[var(--text-ink)]">
+              Personal Consecration Progress
             </h1>
-            <p className="text-[10px] text-gray-500 dark:text-zinc-400">
-              {profile.full_name} · {durationDays} Days of {challengeName}
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {profile.full_name} / {durationDays} Days of {challengeName}
             </p>
           </div>
         </div>
@@ -86,66 +87,65 @@ export default async function ProgressPage() {
       </header>
 
       {/* Stat cards */}
-      <section className="px-4">
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            {
-              value: stats.current_streak,
-              label: 'Current Streak',
-              color: 'text-amber-600 dark:text-amber-400',
-              bg: 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40',
-              suffix: stats.current_streak === 1 ? 'Day' : 'Days',
-            },
-            {
-              value: stats.longest_run,
-              label: 'Longest Run',
-              color: 'text-orange-600 dark:text-orange-400',
-              bg: 'bg-orange-50 dark:bg-orange-950/30 border border-orange-200/50 dark:border-orange-900/40',
-              suffix: stats.longest_run === 1 ? 'Day' : 'Days',
-            },
-            {
-              value: `${stats.total_completed}/${durationDays}`,
-              label: 'Disciplines',
-              color: 'text-green-600 dark:text-green-400',
-              bg: 'bg-green-50 dark:bg-green-950/30 border border-green-200/50 dark:border-green-900/40',
-              suffix: '',
-            },
-          ].map(({ value, label, color, bg, suffix }) => (
-            <div key={label} className={`${bg} rounded-2xl p-3 text-center transition-colors`}>
-              <p className={`text-xl font-black ${color} leading-none`}>
-                {value}
-              </p>
-              {suffix && (
-                <p className={`text-[10px] font-bold ${color} mt-0.5`}>
-                  {suffix}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500 dark:text-zinc-400 mt-1 leading-tight font-medium">
-                {label}
-              </p>
+      <section className="px-4 mt-1">
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-3 text-center">
+            <div className="flex items-center justify-center text-[var(--flame-accent)] mb-1">
+              <Flame size={16} strokeWidth={1.75} />
             </div>
-          ))}
+            <p className="text-xl font-bold tracking-tight text-[var(--text-ink)] leading-none">
+              {stats.current_streak}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">
+              Current Streak
+            </p>
+          </div>
+
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-3 text-center">
+            <div className="flex items-center justify-center text-[var(--text-muted)] mb-1">
+              <TrendingUp size={16} strokeWidth={1.75} />
+            </div>
+            <p className="text-xl font-bold tracking-tight text-[var(--text-ink)] leading-none">
+              {stats.longest_run}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">
+              Longest Run
+            </p>
+          </div>
+
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-3 text-center">
+            <div className="flex items-center justify-center text-[var(--olive-accent)] mb-1">
+              <CheckCheck size={16} strokeWidth={1.75} />
+            </div>
+            <p className="text-xl font-bold tracking-tight text-[var(--text-ink)] leading-none">
+              {stats.total_completed}
+              <span className="text-xs font-normal text-[var(--text-muted)]">/{durationDays}</span>
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">
+              Disciplines
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Overall progress bar */}
-      <section className="px-4 mt-4">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-zinc-800 transition-colors">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-sm font-bold text-gray-900 dark:text-zinc-100">
-              Consecration Journey
+      <section className="px-4 mt-3">
+        <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-[var(--text-ink)]">
+              Consecration Milestone
             </span>
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-semibold text-[var(--flame-accent)]">
               {pct}%
             </span>
           </div>
-          <div className="h-3 rounded-full bg-gray-100 dark:bg-zinc-800 overflow-hidden">
+          <div className="h-2 rounded-full bg-[var(--bg-subtle)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-700"
+              className="h-full rounded-full bg-[var(--flame-accent)] transition-all duration-500 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>
-          <div className="flex justify-between mt-1.5 text-[10px] text-gray-400 dark:text-zinc-500">
+          <div className="flex justify-between mt-2 text-[10px] text-[var(--text-muted)]">
             <span>Day 1</span>
             <span>
               {currentDay > 0 && currentDay <= durationDays
@@ -155,16 +155,16 @@ export default async function ProgressPage() {
           </div>
 
           {/* Milestone markers */}
-          <div className="flex justify-between mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+          <div className="flex justify-between mt-3 pt-3 border-t border-[var(--border-hairline)]">
             {milestones.map((milestone) => {
               const reached = stats.total_completed >= milestone
               return (
                 <div key={milestone} className="flex flex-col items-center gap-1">
                   <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium transition-colors ${
                       reached
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-500'
+                        ? 'bg-[var(--flame-accent)] text-white'
+                        : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-hairline)]'
                     }`}
                   >
                     {milestone}
@@ -177,7 +177,7 @@ export default async function ProgressPage() {
       </section>
 
       {/* Full Consecration Matrix */}
-      <section className="px-4 mt-4">
+      <section className="px-4 mt-3">
         <ConsecrationMatrix
           currentDay={currentDay > 0 && currentDay <= durationDays ? currentDay : null}
           completedDayNumbers={completedDayNumbers}
@@ -189,24 +189,23 @@ export default async function ProgressPage() {
 
       {/* Certificate preview */}
       {stats.total_completed < durationDays && (
-        <section className="px-4 mt-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-dashed border-amber-300 dark:border-amber-600/50 transition-colors">
+        <section className="px-4 mt-3 mb-4">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 border border-dashed border-[var(--border-hairline)]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/40 flex items-center justify-center text-xl">
-                🎖️
+              <div className="w-9 h-9 rounded-lg bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center shrink-0 border border-[var(--border-hairline)]">
+                <Award size={18} strokeWidth={1.75} />
               </div>
-              <div>
-                <p className="text-sm font-bold text-gray-900 dark:text-zinc-100">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-[var(--text-ink)]">
                   BBCC Certificate of Consecration
                 </p>
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                  Available upon Day {durationDays} completion
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                  Conferred upon completion of Day {durationDays}
                 </p>
               </div>
-              <div className="ml-auto">
-                <span className="text-xs text-gray-400 dark:text-zinc-500 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded-lg font-medium">
-                  🔒 Locked
-                </span>
+              <div className="shrink-0 flex items-center gap-1 text-[11px] text-[var(--text-muted)] bg-[var(--bg-subtle)] px-2 py-1 rounded-md border border-[var(--border-hairline)]">
+                <Lock size={12} strokeWidth={1.75} />
+                <span>Locked</span>
               </div>
             </div>
           </div>

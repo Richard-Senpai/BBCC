@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Flame, TrendingUp, CheckCheck, Building2, Phone, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
@@ -47,10 +48,10 @@ export default async function ProfilePage() {
         <div className="flex items-center gap-3">
           <BBCCLogo size="sm" />
           <div>
-            <h1 className="text-base font-black text-gray-900 dark:text-zinc-100">
+            <h1 className="text-sm font-semibold tracking-tight text-[var(--text-ink)]">
               Member Profile
             </h1>
-            <p className="text-[10px] text-gray-500 dark:text-zinc-400">
+            <p className="text-[11px] text-[var(--text-muted)]">
               {durationDays} Days of {challengeName}
             </p>
           </div>
@@ -63,7 +64,7 @@ export default async function ProfilePage() {
 
       {/* Identity & Avatar Upload Card */}
       <section className="px-4 mt-2">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-zinc-800 transition-colors text-center">
+        <div className="bg-[var(--bg-surface)] rounded-xl p-5 border border-[var(--border-hairline)] text-center shadow-xs">
           {/* Avatar Uploader Component */}
           <AvatarUploader
             userId={profile.id}
@@ -72,23 +73,26 @@ export default async function ProfilePage() {
           />
 
           <div className="mt-3">
-            <div className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full mb-1 border border-green-200/50 dark:border-green-800/40">
-              ✓ Active Disciple · Cohort 2025
+            <div className="inline-flex items-center gap-1 bg-[var(--bg-subtle)] text-[var(--olive-accent)] text-[10px] font-medium px-2 py-0.5 rounded-full mb-1.5 border border-[var(--border-hairline)]">
+              <Check size={11} strokeWidth={2} />
+              <span>Active Disciple</span>
             </div>
-            <h2 className="text-lg font-black text-gray-900 dark:text-zinc-100">
+            <h2 className="text-base font-semibold text-[var(--text-ink)]">
               {profile.full_name}
             </h2>
             {profile.fellowship_unit && (
-              <p className="text-xs text-gray-600 dark:text-zinc-400 font-medium flex items-center justify-center gap-1 mt-0.5">
-                <span>🏛️</span> {profile.fellowship_unit}
+              <p className="text-xs text-[var(--text-muted)] font-medium flex items-center justify-center gap-1.5 mt-0.5">
+                <Building2 size={12} strokeWidth={1.75} className="text-[var(--text-muted)]" />
+                <span>{profile.fellowship_unit}</span>
               </p>
             )}
-            <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {profile.email}
             </p>
             {profile.phone && (
-              <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
-                📞 {profile.phone}
+              <p className="text-xs text-[var(--text-muted)] flex items-center justify-center gap-1 mt-0.5">
+                <Phone size={11} strokeWidth={1.75} className="text-[var(--text-muted)]" />
+                <span>{profile.phone}</span>
               </p>
             )}
           </div>
@@ -97,50 +101,57 @@ export default async function ProfilePage() {
 
       {/* Stats */}
       <section className="px-4 mt-3">
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            {
-              value: stats.current_streak,
-              label: 'Current\nStreak',
-              color: 'text-amber-600 dark:text-amber-400',
-              bg: 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40',
-            },
-            {
-              value: stats.longest_run,
-              label: 'Longest\nRun',
-              color: 'text-orange-600 dark:text-orange-400',
-              bg: 'bg-orange-50 dark:bg-orange-950/30 border border-orange-200/50 dark:border-orange-900/40',
-            },
-            {
-              value: `${stats.total_completed}/40`,
-              label: 'Disciplines',
-              color: 'text-green-600 dark:text-green-400',
-              bg: 'bg-green-50 dark:bg-green-950/30 border border-green-200/50 dark:border-green-900/40',
-            },
-          ].map(({ value, label, color, bg }) => (
-            <div key={label} className={`${bg} rounded-2xl p-3 text-center`}>
-              <p className={`text-xl font-black ${color} leading-none`}>
-                {value}
-              </p>
-              <p className="text-[9px] text-gray-500 dark:text-zinc-400 mt-1 leading-tight whitespace-pre-line font-medium">
-                {label}
-              </p>
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-3 text-center">
+            <div className="flex items-center justify-center text-[var(--flame-accent)] mb-1">
+              <Flame size={16} strokeWidth={1.75} />
             </div>
-          ))}
+            <p className="text-xl font-bold tracking-tight text-[var(--text-ink)] leading-none">
+              {stats.current_streak}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">
+              Current Streak
+            </p>
+          </div>
+
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-3 text-center">
+            <div className="flex items-center justify-center text-[var(--text-muted)] mb-1">
+              <TrendingUp size={16} strokeWidth={1.75} />
+            </div>
+            <p className="text-xl font-bold tracking-tight text-[var(--text-ink)] leading-none">
+              {stats.longest_run}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">
+              Longest Run
+            </p>
+          </div>
+
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-3 text-center">
+            <div className="flex items-center justify-center text-[var(--olive-accent)] mb-1">
+              <CheckCheck size={16} strokeWidth={1.75} />
+            </div>
+            <p className="text-xl font-bold tracking-tight text-[var(--text-ink)] leading-none">
+              {stats.total_completed}
+              <span className="text-xs font-normal text-[var(--text-muted)]">/{durationDays}</span>
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1 font-medium">
+              Disciplines
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Fellowship unit card */}
       {profile.fellowship_unit && (
         <section className="px-4 mt-3">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-zinc-800 transition-colors">
-            <h3 className="text-xs font-black text-gray-500 dark:text-zinc-400 uppercase tracking-widest mb-2.5">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 border border-[var(--border-hairline)] shadow-xs">
+            <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">
               Fellowship &amp; Ministry Unit
             </h3>
-            <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/40 rounded-xl p-3">
+            <div className="flex items-center justify-between bg-[var(--bg-subtle)] border border-[var(--border-hairline)] rounded-lg p-3">
               <div className="flex items-center gap-2">
-                <span className="text-lg">🏛️</span>
-                <p className="text-sm font-bold text-gray-800 dark:text-zinc-200">
+                <Building2 size={16} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
+                <p className="text-xs font-semibold text-[var(--text-ink)]">
                   {profile.fellowship_unit}
                 </p>
               </div>
@@ -151,7 +162,7 @@ export default async function ProfilePage() {
 
       {/* Sign out */}
       <section className="px-4 mt-4">
-        <div className="bg-red-50 dark:bg-red-950/20 rounded-2xl p-4 border border-red-100 dark:border-red-900/30 text-center">
+        <div className="bg-[var(--bg-surface)] rounded-xl p-3 border border-[var(--border-hairline)] text-center">
           <LogoutButton />
         </div>
       </section>

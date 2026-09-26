@@ -3,6 +3,7 @@
 import { useOptimistic, useTransition } from 'react'
 import { toggleActivityCompletion } from '@/lib/actions/completions'
 import type { Activity } from '@/lib/types'
+import { Check, CheckCircle2, Circle } from 'lucide-react'
 
 interface ActivityChecklistProps {
   dayId: string
@@ -49,16 +50,16 @@ export default function ActivityChecklist({
     <div>
       {/* Header row */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-gray-900 dark:text-zinc-100 text-sm">
-          Daily Consecration Checklist
+        <h3 className="font-bold text-[var(--text-ink)] text-sm tracking-tight">
+          Daily Consecration Disciplines
         </h3>
-        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-800/40">
-          {doneCount} of {total} Done
+        <span className="text-xs font-semibold text-[var(--covenant-accent)] bg-[var(--covenant-subtle)] px-2.5 py-0.5 rounded-full border border-[var(--covenant-accent)]/20">
+          {doneCount} of {total} completed
         </span>
       </div>
 
       {/* Activity rows */}
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {sorted.map((activity) => {
           const done = optimisticDone.has(activity.id)
           return (
@@ -68,54 +69,52 @@ export default function ActivityChecklist({
               onClick={() => handleToggle(activity.id)}
               disabled={!isToday}
               className={`
-                w-full flex items-start gap-3 p-3 rounded-xl border text-left
+                w-full flex items-start gap-3 p-3.5 rounded-xl border text-left
                 transition-all duration-150
                 ${
                   done
-                    ? 'bg-green-50/90 dark:bg-green-950/30 border-green-300 dark:border-green-800/60'
-                    : 'bg-white dark:bg-zinc-800/90 border-gray-200 dark:border-zinc-700 hover:border-amber-400 dark:hover:border-amber-400'
+                    ? 'bg-[var(--covenant-subtle)] border-[var(--covenant-accent)]/25'
+                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:border-[var(--flame-accent)]/50'
                 }
                 ${!isToday ? 'opacity-70 cursor-default' : 'cursor-pointer active:scale-[0.99]'}
               `}
             >
-              {/* Circle indicator */}
+              {/* Checkbox indicator with deliberate motion spring */}
               <div
                 className={`
-                  mt-0.5 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center
-                  border-2 transition-all
+                  mt-0.5 w-5 h-5 rounded-md shrink-0 flex items-center justify-center
+                  border transition-all
                   ${
                     done
-                      ? 'bg-green-500 border-green-500'
-                      : 'border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
+                      ? 'bg-[var(--covenant-accent)] border-[var(--covenant-accent)] text-white shadow-2xs animate-check-spring'
+                      : 'border-[var(--border-strong)] bg-[var(--bg-surface)]'
                   }
                 `}
               >
                 {done && (
-                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check size={13} strokeWidth={2.5} className="text-white" />
                 )}
               </div>
 
               {/* Text */}
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p
-                  className={`text-sm font-semibold leading-snug ${
+                  className={`text-sm font-medium leading-snug ${
                     done
-                      ? 'text-gray-400 dark:text-zinc-500 line-through'
-                      : 'text-gray-900 dark:text-zinc-100'
+                      ? 'text-[var(--text-muted)] line-through decoration-[var(--border-strong)]'
+                      : 'text-[var(--text-ink)]'
                   }`}
                 >
                   {activity.description}
                 </p>
                 {!done && isToday && (
-                  <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5 font-medium">
-                    Pending
+                  <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
+                    Today&apos;s spiritual discipline
                   </p>
                 )}
                 {done && (
-                  <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 font-bold">
-                    Completed ✓
+                  <p className="text-[11px] text-[var(--covenant-accent)] mt-0.5 font-medium flex items-center gap-1">
+                    Completed
                   </p>
                 )}
               </div>
@@ -126,48 +125,25 @@ export default function ActivityChecklist({
 
       {/* Spiritual Reflections textarea */}
       <div className="mt-4">
-        <label className="text-xs font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+        <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
           Spiritual Reflections &amp; Journal Note
         </label>
         <textarea
-          placeholder="Write today's revelations, prayers, or answers received during communion with the Lord…"
+          placeholder="Record today&apos;s revelations, scripture insights, or prayers during devotion…"
           rows={3}
           disabled={!isToday}
-          className="mt-1.5 w-full text-sm font-medium p-3 rounded-xl border transition-all resize-none bg-white text-gray-950 placeholder:text-gray-400 border-gray-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:focus:ring-amber-400 shadow-sm disabled:opacity-60"
+          className="bbcc-input resize-none disabled:opacity-60"
         />
       </div>
 
-      {/* CTA Button */}
-      {isToday && total > 0 && (
-        <button
-          type="button"
-          className={`
-            w-full mt-4 py-3.5 rounded-xl font-bold text-white text-sm
-            flex items-center justify-center gap-2 transition-all shadow-md
-            ${
-              allDone
-                ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20'
-                : 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20'
-            }
-          `}
-        >
-          {allDone ? (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Day {dayNumber} Complete!
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Mark Day {dayNumber} Complete ({doneCount} of {total} done)
-            </>
-          )}
-        </button>
+      {/* Status Banner */}
+      {isToday && total > 0 && allDone && (
+        <div className="mt-4 py-3 px-4 rounded-xl bg-[var(--covenant-subtle)] border border-[var(--covenant-accent)]/30 text-[var(--covenant-accent)] text-xs font-bold flex items-center justify-center gap-2">
+          <CheckCircle2 size={16} strokeWidth={2} />
+          <span>Day {dayNumber} Consecration Complete</span>
+        </div>
       )}
     </div>
   )
 }
+
