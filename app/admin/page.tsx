@@ -159,10 +159,11 @@ export default async function AdminPage() {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
-              href="/dashboard"
-              className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] border border-[var(--border-hairline)] px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+              href="/dashboard?preview=true"
+              className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] border border-[var(--border-hairline)] px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow-2xs"
+              title="Preview member dashboard experience"
             >
-              <Eye size={13} strokeWidth={1.75} />
+              <Eye size={13} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
               <span>Member View</span>
             </Link>
             <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-[var(--bg-subtle)] text-[var(--text-ink)] px-2.5 py-1.5 rounded-lg border border-[var(--border-hairline)]">

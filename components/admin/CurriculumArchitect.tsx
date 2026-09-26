@@ -9,6 +9,8 @@ import {
   Trash2,
   Check,
   Users,
+  Video,
+  ExternalLink,
 } from 'lucide-react'
 import { saveChallengeDay } from '@/lib/actions/admin'
 import type { ChallengeDayWithActivities, DayCompletionCount } from '@/lib/types'
@@ -51,19 +53,30 @@ export default function CurriculumArchitect({
   const [description, setDescription] = useState(
     selectedDay?.description ?? ''
   )
+  function isValidUrl(val: string): boolean {
+    if (!val || !val.trim()) return true
+    try {
+      const u = new URL(val.trim())
+      return u.protocol === 'http:' || u.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+
   const [activities, setActivities] = useState<
-    { id?: string; description: string; sort_order: number }[]
+    { id?: string; description: string; sort_order: number; video_url?: string | null }[]
   >(
     selectedDay?.activities && selectedDay.activities.length > 0
       ? selectedDay.activities.map((a) => ({
           id: a.id,
           description: a.description,
           sort_order: a.sort_order,
+          video_url: a.video_url ?? '',
         }))
       : [
-          { description: 'Morning Prayer Watch (30 mins personal devotion)', sort_order: 1 },
-          { description: 'Scripture Meditation & Journaling', sort_order: 2 },
-          { description: 'Midday Fasting & Fellowship Consecration', sort_order: 3 },
+          { description: 'Morning Prayer Watch (30 mins personal devotion)', sort_order: 1, video_url: '' },
+          { description: 'Scripture Meditation & Journaling', sort_order: 2, video_url: '' },
+          { description: 'Midday Fasting & Fellowship Consecration', sort_order: 3, video_url: '' },
         ]
   )
 
@@ -80,11 +93,12 @@ export default function CurriculumArchitect({
             id: a.id,
             description: a.description,
             sort_order: a.sort_order,
+            video_url: a.video_url ?? '',
           }))
         : [
-            { description: 'Morning Prayer Watch (30 mins personal devotion)', sort_order: 1 },
-            { description: 'Scripture Meditation & Journaling', sort_order: 2 },
-            { description: 'Midday Fasting & Fellowship Consecration', sort_order: 3 },
+            { description: 'Morning Prayer Watch (30 mins personal devotion)', sort_order: 1, video_url: '' },
+            { description: 'Scripture Meditation & Journaling', sort_order: 2, video_url: '' },
+            { description: 'Midday Fasting & Fellowship Consecration', sort_order: 3, video_url: '' },
           ]
     )
   }
@@ -95,13 +109,20 @@ export default function CurriculumArchitect({
       {
         description: 'New devotional activity prompt',
         sort_order: activities.length + 1,
+        video_url: '',
       },
     ])
   }
 
-  function handleUpdateActivity(idx: number, newDesc: string) {
+  function handleUpdateActivityDescription(idx: number, newDesc: string) {
     const updated = [...activities]
     updated[idx].description = newDesc
+    setActivities(updated)
+  }
+
+  function handleUpdateActivityVideoUrl(idx: number, newUrl: string) {
+    const updated = [...activities]
+    updated[idx].video_url = newUrl
     setActivities(updated)
   }
 
@@ -128,6 +149,19 @@ export default function CurriculumArchitect({
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setFeedback(null)
+
+    // Validate video URLs before saving
+    for (let i = 0; i < activities.length; i++) {
+      const vUrl = activities[i].video_url
+      if (vUrl && vUrl.trim() && !isValidUrl(vUrl)) {
+        setFeedback({
+          type: 'error',
+          text: `Activity #${i + 1} has an invalid video link "${vUrl}". Must be a valid web link starting with http:// or https://`,
+        })
+        return
+      }
+    }
+
     startTransition(async () => {
       try {
         await saveChallengeDay({
@@ -360,56 +394,100 @@ export default function CurriculumArchitect({
                 </span>
               </div>
 
-              <div className="space-y-1.5">
-                {activities.map((act, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 bg-[var(--bg-subtle)] p-2 rounded-lg border border-[var(--border-hairline)] transition-colors"
-                  >
-                    {/* Reorder Buttons */}
-                    <div className="flex flex-col items-center">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveActivity(idx, 'up')}
-                        disabled={idx === 0}
-                        aria-label="Move activity up"
-                        className="text-[var(--text-muted)] hover:text-[var(--text-ink)] disabled:opacity-20 cursor-pointer"
-                      >
-                        <ChevronUp size={11} strokeWidth={2} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveActivity(idx, 'down')}
-                        disabled={idx === activities.length - 1}
-                        aria-label="Move activity down"
-                        className="text-[var(--text-muted)] hover:text-[var(--text-ink)] disabled:opacity-20 cursor-pointer"
-                      >
-                        <ChevronDown size={11} strokeWidth={2} />
-                      </button>
-                    </div>
-
-                    <span className="w-4 h-4 rounded-full bg-[var(--olive-accent)] text-white font-bold text-[9px] flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-
-                    <input
-                      type="text"
-                      required
-                      value={act.description}
-                      onChange={(e) => handleUpdateActivity(idx, e.target.value)}
-                      className="flex-1 px-2.5 py-1 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteActivity(idx)}
-                      title="Remove activity"
-                      className="w-6 h-6 rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 flex items-center justify-center transition cursor-pointer"
+              <div className="space-y-2">
+                {activities.map((act, idx) => {
+                  const hasInvalidUrl = Boolean(act.video_url && !isValidUrl(act.video_url))
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-[var(--bg-subtle)] p-2.5 rounded-lg border border-[var(--border-hairline)] space-y-2 transition-colors"
                     >
-                      <Trash2 size={12} strokeWidth={1.75} />
-                    </button>
-                  </div>
-                ))}
+                      {/* Row 1: Reorder Buttons, Number, Description, Delete */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-center">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveActivity(idx, 'up')}
+                            disabled={idx === 0}
+                            aria-label="Move activity up"
+                            className="text-[var(--text-muted)] hover:text-[var(--text-ink)] disabled:opacity-20 cursor-pointer"
+                          >
+                            <ChevronUp size={11} strokeWidth={2} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveActivity(idx, 'down')}
+                            disabled={idx === activities.length - 1}
+                            aria-label="Move activity down"
+                            className="text-[var(--text-muted)] hover:text-[var(--text-ink)] disabled:opacity-20 cursor-pointer"
+                          >
+                            <ChevronDown size={11} strokeWidth={2} />
+                          </button>
+                        </div>
+
+                        <span className="w-5 h-5 rounded-full bg-[var(--olive-accent)] text-white font-bold text-[9px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+
+                        <input
+                          type="text"
+                          required
+                          placeholder="Activity description (e.g. Morning Prayer Watch)"
+                          value={act.description}
+                          onChange={(e) => handleUpdateActivityDescription(idx, e.target.value)}
+                          className="flex-1 px-2.5 py-1.5 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] shadow-xs"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteActivity(idx)}
+                          title="Remove activity"
+                          className="w-6 h-6 rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 flex items-center justify-center transition cursor-pointer shrink-0"
+                        >
+                          <Trash2 size={12} strokeWidth={1.75} />
+                        </button>
+                      </div>
+
+                      {/* Row 2: Optional Video Link input with inline validation */}
+                      <div className="pl-7">
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative flex-1">
+                            <input
+                              type="url"
+                              placeholder="Optional video link (e.g. https://youtu.be/...)"
+                              value={act.video_url ?? ''}
+                              onChange={(e) => handleUpdateActivityVideoUrl(idx, e.target.value)}
+                              className={`w-full px-2.5 py-1 pl-7 text-[11px] font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border rounded-md focus:outline-none focus:ring-1 shadow-xs transition ${
+                                hasInvalidUrl
+                                  ? 'border-red-500 focus:ring-red-500'
+                                  : 'border-[var(--border-hairline)] focus:ring-[var(--flame-accent)]'
+                              }`}
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
+                              <Video size={11} strokeWidth={1.75} />
+                            </span>
+                          </div>
+                          {act.video_url && isValidUrl(act.video_url) && (
+                            <a
+                              href={act.video_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-[var(--flame-accent)] hover:underline flex items-center gap-1 shrink-0 px-2 py-1 rounded bg-[var(--flame-subtle)] border border-[var(--flame-accent)]/20"
+                            >
+                              <span>Test</span>
+                              <ExternalLink size={10} strokeWidth={1.75} />
+                            </a>
+                          )}
+                        </div>
+                        {hasInvalidUrl && (
+                          <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1 font-medium">
+                            <span>⚠ Invalid URL. Please enter a valid web link starting with http:// or https://</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
               <button

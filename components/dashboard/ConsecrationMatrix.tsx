@@ -1,8 +1,11 @@
+import Link from 'next/link'
 import { Check } from 'lucide-react'
 
 interface ConsecrationMatrixProps {
   /** 1..durationDays: the active challenge day. null/0 if not started */
   currentDay: number | null
+  /** Currently selected/viewed day on dashboard (for highlighting) */
+  selectedDay?: number | null
   /** Set of day numbers the user has fully completed */
   completedDayNumbers: number[]
   totalCompleted: number
@@ -12,6 +15,8 @@ interface ConsecrationMatrixProps {
   challengeName?: string
   /** Whether to show a compact version (dashboard) vs full (progress page) */
   compact?: boolean
+  /** When previewing as a specific member */
+  asMemberId?: string | null
 }
 
 type DayStatus = 'completed' | 'current' | 'missed' | 'upcoming'
@@ -36,10 +41,12 @@ const statusStyles: Record<DayStatus, string> = {
 
 export default function ConsecrationMatrix({
   currentDay,
+  selectedDay,
   completedDayNumbers,
   totalCompleted,
   durationDays = 40,
   challengeName = 'Overcomer',
+  asMemberId,
 }: ConsecrationMatrixProps) {
   const days = Array.from({ length: durationDays }, (_, i) => i + 1)
   const completedSet = new Set(completedDayNumbers)
@@ -53,7 +60,7 @@ export default function ConsecrationMatrix({
             {durationDays}-Day Consecration Matrix
           </h3>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Spiritual fidelity from Day 1 to Day {durationDays}
+            Spiritual fidelity from Day 1 to Day {durationDays} · Tap past days to review
           </p>
         </div>
         <div className="flex flex-col items-center bg-[var(--covenant-subtle)] rounded-xl px-3 py-1.5 border border-[var(--covenant-accent)]/20">
@@ -68,14 +75,19 @@ export default function ConsecrationMatrix({
       <div className="grid grid-cols-7 gap-1.5 mt-3">
         {days.map((day) => {
           const status = getDayStatus(day, currentDay, completedSet)
-          return (
+          const isAvailable = (currentDay !== null && day <= currentDay) || completedSet.has(day)
+          const isSelected = selectedDay === day
+          const linkHref = `/dashboard?day=${day}${asMemberId ? `&as_member=${asMemberId}` : ''}`
+
+          const cellContent = (
             <div
-              key={day}
-              title={`Day ${day} — ${status}`}
+              title={`Day ${day} — ${status}${isAvailable ? ' (Tap to view)' : ''}`}
               className={`
                 aspect-square rounded-lg flex items-center justify-center
-                text-[11px] font-medium transition-colors
+                text-[11px] font-medium transition-all
                 ${statusStyles[status]}
+                ${isSelected ? 'ring-2 ring-[var(--flame-accent)] ring-offset-2 ring-offset-[var(--bg-surface)] scale-105 z-10 font-bold shadow-xs' : ''}
+                ${isAvailable ? 'hover:opacity-90 active:scale-95 cursor-pointer' : 'cursor-default'}
               `}
             >
               {status === 'completed' ? (
@@ -83,6 +95,20 @@ export default function ConsecrationMatrix({
               ) : (
                 day
               )}
+            </div>
+          )
+
+          if (isAvailable) {
+            return (
+              <Link key={day} href={linkHref} className="block outline-none">
+                {cellContent}
+              </Link>
+            )
+          }
+
+          return (
+            <div key={day} className="block">
+              {cellContent}
             </div>
           )
         })}

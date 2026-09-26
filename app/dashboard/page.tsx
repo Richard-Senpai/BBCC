@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
@@ -6,7 +7,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import ActivityChecklist from '@/components/dashboard/ActivityChecklist'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
-import { Flame, BookOpen, Sparkles, Hourglass, Trophy, Users } from 'lucide-react'
+import { Flame, BookOpen, Sparkles, Hourglass, Trophy, Users, Eye, ArrowLeft, History } from 'lucide-react'
 import type {
   Profile,
   ChallengeSettings,
@@ -131,15 +132,24 @@ function CompletedView({
 // Main page
 // ─────────────────────────────────────────
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams?: Promise<{
+    day?: string
+    as_member?: string
+    preview?: string
+  }>
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const supabase = await createClient()
+  const resolvedParams = searchParams ? await searchParams : {}
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // ── Parallel fetches: profile, settings, current day ──────
+  // ── Fetch current logged-in user profile & settings ────────
   const [profileRes, settingsRes, currentDayRes] = await Promise.all([
     supabase
       .from('profiles')
@@ -155,62 +165,87 @@ export default async function DashboardPage() {
   ])
 
   const profile = profileRes.data
+  if (!profile) redirect('/login')
+
   const settings = settingsRes.data
   const currentDay = (currentDayRes.data as number) ?? 0
-
-  if (!profile) redirect('/login')
-  if (profile.role === 'admin') redirect('/admin')
-
-  const timezone = settings?.timezone ?? 'Africa/Lagos'
-
   const durationDays = settings?.duration_days ?? 40
   const challengeName = settings?.challenge_name ?? 'Overcomer'
   const challengeTitle = `${durationDays} Days of ${challengeName}`
+  const timezone = settings?.timezone ?? 'Africa/Lagos'
 
-  // ── Determine phase ────────────────────────────────────────
-  if (currentDay === 0) {
-    return (
-      <>
-        <DashboardHeader profile={profile} streak={0} challengeTitle={challengeTitle} />
-        <NotStartedView
-          profile={profile}
-          settings={settings}
-          durationDays={durationDays}
-          challengeName={challengeName}
-        />
-      </>
-    )
-  }
-  if (currentDay > durationDays) {
-    return (
-      <>
-        <DashboardHeader profile={profile} streak={0} challengeTitle={challengeTitle} />
-        <CompletedView
-          profile={profile}
-          durationDays={durationDays}
-          challengeName={challengeName}
-        />
-      </>
-    )
+  const isAdmin = profile.role === 'admin'
+  let effectiveMemberId = user.id
+  let displayProfile = profile
+
+  // If pastoral admin is previewing a specific member
+  if (isAdmin && resolvedParams.as_member) {
+    const { data: memberProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', resolvedParams.as_member)
+      .maybeSingle()
+    if (memberProfile) {
+      displayProfile = memberProfile
+      effectiveMemberId = memberProfile.id
+    }
   }
 
-  // ── Active phase: fetch all dashboard data in parallel ─────
+  // ── Calculate Active Day (Today vs Historical Day Review) ────
+  const parsedDay = resolvedParams.day ? parseInt(resolvedParams.day, 10) : null
+  const hasSpecificDay = parsedDay !== null && !isNaN(parsedDay) && parsedDay > 0 && parsedDay <= durationDays
+  const isPastDayView = hasSpecificDay && parsedDay !== currentDay
+  const activeDayNum = hasSpecificDay
+    ? parsedDay
+    : (currentDay > 0 && currentDay <= durationDays ? currentDay : 1)
+  const isToday = currentDay > 0 && currentDay <= durationDays && activeDayNum === currentDay
+
+  // ── Determine phase edge cases for regular members ──────────
+  if (!isAdmin && !hasSpecificDay) {
+    if (currentDay === 0) {
+      return (
+        <>
+          <DashboardHeader profile={displayProfile} streak={0} challengeTitle={challengeTitle} />
+          <NotStartedView
+            profile={displayProfile}
+            settings={settings}
+            durationDays={durationDays}
+            challengeName={challengeName}
+          />
+        </>
+      )
+    }
+    if (currentDay > durationDays) {
+      return (
+        <>
+          <DashboardHeader profile={displayProfile} streak={0} challengeTitle={challengeTitle} />
+          <CompletedView
+            profile={displayProfile}
+            durationDays={durationDays}
+            challengeName={challengeName}
+          />
+        </>
+      )
+    }
+  }
+
+  // ── Fetch active day & effective member data in parallel ───
   const [challengeRes, activityCompRes, statsRes, completedDaysRes] =
     await Promise.all([
       supabase
         .from('challenge_days')
         .select('*')
-        .eq('day_number', currentDay)
+        .eq('day_number', activeDayNum)
         .maybeSingle(),
       supabase
         .from('activity_completions')
         .select('activity_id')
-        .eq('user_id', user.id),
-      supabase.rpc('get_member_stats', { member_id: user.id }),
+        .eq('user_id', effectiveMemberId),
+      supabase.rpc('get_member_stats', { member_id: effectiveMemberId }),
       supabase
         .from('completions')
         .select('challenge_days!inner(day_number)')
-        .eq('user_id', user.id),
+        .eq('user_id', effectiveMemberId),
     ])
 
   const dayRow = challengeRes.data
@@ -219,12 +254,12 @@ export default async function DashboardPage() {
   if (dayRow?.id) {
     const { data: actData, error: actError } = await supabase
       .from('activities')
-      .select('id, challenge_day_id, description, sort_order')
+      .select('id, challenge_day_id, description, sort_order, video_url')
       .eq('challenge_day_id', dayRow.id)
       .order('sort_order', { ascending: true })
 
     if (actError) {
-      console.error(`[Dashboard] Error loading activities for day ${currentDay} (${dayRow.id}):`, actError)
+      console.error(`[Dashboard] Error loading activities for day ${activeDayNum} (${dayRow.id}):`, actError)
     } else {
       activities = actData ?? []
     }
@@ -236,6 +271,7 @@ export default async function DashboardPage() {
         activities,
       }
     : null
+
   const completedActivityIds = (activityCompRes.data ?? []).map(
     (c) => c.activity_id
   )
@@ -253,15 +289,56 @@ export default async function DashboardPage() {
     })
     .filter((n): n is number => typeof n === 'number')
 
-  const isDayComplete = completedDayNumbers.includes(currentDay)
+  const isDayComplete = completedDayNumbers.includes(activeDayNum)
   const pct = Math.round((stats.total_completed / durationDays) * 100 * 10) / 10
   const nextMilestone = getNextMilestone(currentDay, durationDays)
   const greeting = getGreeting(timezone)
   const dayOfWeek = getDayOfWeek(timezone)
-  const firstName = profile.full_name.split(' ')[0]
+  const firstName = displayProfile.full_name.split(' ')[0]
 
   return (
     <>
+      {/* ── Pastoral Preview Mode Banner ───────────────────── */}
+      {isAdmin && (
+        <aside className="sticky top-0 z-50 bg-[var(--bg-surface)] border-b border-[var(--flame-accent)]/30 px-4 py-2 text-xs flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[var(--flame-accent)] animate-pulse shrink-0" />
+            <span className="font-bold text-[var(--flame-accent)] flex items-center gap-1.5 shrink-0">
+              <Eye size={13} strokeWidth={2} />
+              Pastoral Preview Mode
+            </span>
+            <span className="text-[var(--text-muted)] text-[11px] truncate hidden sm:inline">
+              — Viewing {effectiveMemberId !== user.id ? `disciple: ${displayProfile.full_name}` : 'member dashboard experience'}
+            </span>
+          </div>
+          <Link
+            href="/admin"
+            className="text-[11px] font-semibold text-white bg-[var(--flame-accent)] hover:opacity-90 px-2.5 py-1 rounded-md transition shadow-2xs flex items-center gap-1 shrink-0"
+          >
+            <ArrowLeft size={11} strokeWidth={2} />
+            <span>Return to Admin</span>
+          </Link>
+        </aside>
+      )}
+
+      {/* ── Past Day Historical Review Banner ────────────────── */}
+      {isPastDayView && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-hairline)] flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <History size={14} strokeWidth={2} className="text-[var(--flame-accent)] shrink-0" />
+            <p className="text-xs font-semibold text-[var(--text-ink)]">
+              Viewing Day {activeDayNum} Historical Record
+            </p>
+          </div>
+          <Link
+            href={`/dashboard${effectiveMemberId !== user.id ? `?as_member=${effectiveMemberId}` : ''}`}
+            className="text-[11px] font-semibold text-[var(--flame-accent)] hover:underline flex items-center gap-1"
+          >
+            <span>Return to Today (Day {currentDay})</span>
+          </Link>
+        </div>
+      )}
+
       {/* ── Header ─────────────────────────────────────────── */}
       <DashboardHeader profile={profile} streak={stats.current_streak} challengeTitle={challengeTitle} />
 
@@ -269,14 +346,14 @@ export default async function DashboardPage() {
       <section className="px-4 mt-2">
         <div className="flex items-center gap-3 py-2">
           <UserAvatar
-            avatarUrl={profile.avatar_url}
-            name={profile.full_name}
+            avatarUrl={displayProfile.avatar_url}
+            name={displayProfile.full_name}
             size="md"
           />
           <div className="min-w-0 flex-1">
-            {profile.fellowship_unit && (
+            {displayProfile.fellowship_unit && (
               <p className="text-[11px] font-semibold text-[var(--covenant-accent)] tracking-tight truncate">
-                {profile.fellowship_unit}
+                {displayProfile.fellowship_unit}
               </p>
             )}
             <h1 className="text-lg font-bold text-[var(--text-ink)] leading-snug truncate font-serif">
@@ -320,10 +397,10 @@ export default async function DashboardPage() {
           <div className="px-4 pt-4 pb-3.5 border-b border-[var(--border-subtle)]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-[var(--flame-accent)]">
-                Today&apos;s Devotional Focus
+                {isToday ? "Today's Devotional Focus" : `Day ${activeDayNum} Devotional Focus`}
               </span>
               <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)]">
-                Day {currentDay}
+                Day {activeDayNum}
               </span>
             </div>
 
@@ -348,7 +425,7 @@ export default async function DashboardPage() {
               </>
             ) : (
               <p className="text-sm text-[var(--text-muted)] italic mt-2">
-                Content for Day {currentDay} is being prepared by church pastoral leadership.
+                Content for Day {activeDayNum} is being prepared by church pastoral leadership.
               </p>
             )}
           </div>
@@ -359,15 +436,15 @@ export default async function DashboardPage() {
             todayChallenge.activities.length > 0 ? (
               <ActivityChecklist
                 dayId={todayChallenge.id}
-                dayNumber={currentDay}
+                dayNumber={activeDayNum}
                 activities={todayChallenge.activities}
                 initialCompletedIds={completedActivityIds}
                 isDayComplete={isDayComplete}
-                isToday={true}
+                isToday={isToday}
               />
             ) : (
               <p className="text-sm text-[var(--text-muted)] text-center py-4">
-                Disciplines for Day {currentDay} will appear here.
+                Disciplines for Day {activeDayNum} will appear here.
               </p>
             )}
           </div>
@@ -377,11 +454,13 @@ export default async function DashboardPage() {
       {/* ── Consecration Matrix ────────────────────────────── */}
       <section className="px-4 mt-3">
         <ConsecrationMatrix
-          currentDay={currentDay}
+          currentDay={currentDay > 0 && currentDay <= durationDays ? currentDay : null}
+          selectedDay={activeDayNum}
           completedDayNumbers={completedDayNumbers}
           totalCompleted={stats.total_completed}
           durationDays={durationDays}
           challengeName={challengeName}
+          asMemberId={effectiveMemberId !== user.id ? effectiveMemberId : undefined}
         />
       </section>
 

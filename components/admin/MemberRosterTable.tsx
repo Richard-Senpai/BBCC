@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Search, Flame, Award, Bell } from 'lucide-react'
+import Link from 'next/link'
+import { Users, Search, Flame, Award, Bell, Eye } from 'lucide-react'
 import UserAvatar from '@/components/UserAvatar'
 import { FELLOWSHIP_UNITS } from '@/lib/types'
 
@@ -180,6 +181,15 @@ export default function MemberRosterTable({
                     {/* Actions */}
                     <td className="py-3 pl-4 text-right">
                       <div className="inline-flex items-center gap-1.5">
+                        <Link
+                          href={`/dashboard?as_member=${member.id}`}
+                          className="px-2.5 py-1 text-[10px] font-medium text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 shadow-2xs"
+                          title={`Preview ${member.full_name}'s dashboard`}
+                        >
+                          <Eye size={11} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
+                          <span>View Member</span>
+                        </Link>
+
                         {member.current_streak >= 7 ? (
                           <button
                             type="button"
