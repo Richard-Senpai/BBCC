@@ -202,13 +202,13 @@ export default async function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
+            <Link
+              href="/admin/analytics"
               className="text-xs font-medium text-[var(--text-ink)] bg-[var(--bg-surface)] border border-[var(--border-hairline)] hover:bg-[var(--bg-subtle)] px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
               <BarChart3 size={13} strokeWidth={1.75} />
               <span>Export Analytics</span>
-            </button>
+            </Link>
             <a
               href="#announcement-manager"
               className="text-xs font-medium text-white bg-[var(--flame-accent)] hover:opacity-95 px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"

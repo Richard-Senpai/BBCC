@@ -192,7 +192,7 @@ export default function SignupPage() {
           Believers&apos; Banquet Christian Centre
         </h1>
         <p className="text-[var(--flame-accent)] text-xs font-medium mt-0.5">
-          {challengeBranding.duration_days} Days of {challengeBranding.challenge_name}
+          ...Raising Kingdom Leaders
         </p>
       </div>
 
@@ -304,9 +304,7 @@ export default function SignupPage() {
               >
                 <Flame size={13} strokeWidth={1.75} />
                 <span>
-                  {loading
-                    ? 'Creating account…'
-                    : `Enlist for ${challengeBranding.duration_days} Days of ${challengeBranding.challenge_name}`}
+                  {loading ? 'Creating account…' : 'Join BBCC Challenge Hub'}
                 </span>
               </button>
 
@@ -375,7 +373,7 @@ export default function SignupPage() {
           Believers&apos; Banquet Christian Centre
         </p>
         <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-          Campus &amp; City Sanctuary, Ile-Ife, Osun State
+          BBCC, Ile-Ife, Osun State
         </p>
       </div>
     </main>
