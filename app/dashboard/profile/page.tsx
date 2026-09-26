@@ -13,17 +13,26 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, statsRes] = await Promise.all([
+  const [profileRes, settingsRes, statsRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
+      .single(),
+    supabase
+      .from('challenge_settings')
+      .select('*')
+      .eq('id', 1)
       .single(),
     supabase.rpc('get_member_stats', { member_id: user.id }),
   ])
 
   const profile = profileRes.data
   if (!profile) redirect('/login')
+
+  const settings = settingsRes.data
+  const durationDays = settings?.duration_days ?? 40
+  const challengeName = settings?.challenge_name ?? 'Overcomer'
 
   const stats: MemberStats = (statsRes.data as MemberStats[] | null)?.[0] ?? {
     current_streak: 0,
@@ -42,7 +51,7 @@ export default async function ProfilePage() {
               Member Profile
             </h1>
             <p className="text-[10px] text-gray-500 dark:text-zinc-400">
-              BBCC 40-Day Challenge
+              {durationDays} Days of {challengeName}
             </p>
           </div>
         </div>

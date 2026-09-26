@@ -1,31 +1,70 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateChallengeSettings, seed40Days } from '@/lib/actions/admin'
+import { updateChallengeSettings, seedChallengeDays } from '@/lib/actions/admin'
 import type { ChallengeSettings } from '@/lib/types'
 
 interface ScheduleSettingsCardProps {
   settings: ChallengeSettings | null
   hasChallengeDays: boolean
+  existingDaysCount?: number
 }
 
 export default function ScheduleSettingsCard({
   settings,
   hasChallengeDays,
+  existingDaysCount = 0,
 }: ScheduleSettingsCardProps) {
+  const [durationDays, setDurationDays] = useState<number>(settings?.duration_days ?? 40)
+  const [challengeName, setChallengeName] = useState<string>(settings?.challenge_name ?? 'Overcomer')
   const [startDate, setStartDate] = useState(settings?.start_date ?? '')
   const [timezone, setTimezone] = useState(settings?.timezone ?? 'Africa/Lagos')
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [isSeeding, startSeedTransition] = useTransition()
 
+  const initialDuration = settings?.duration_days ?? 40
+  const initialName = settings?.challenge_name ?? 'Overcomer'
+  const initialStartDate = settings?.start_date ?? ''
+
+  // Determine if challenge has already started
+  const isStarted = Boolean(settings?.start_date && new Date(settings.start_date) <= new Date())
+
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setMsg(null)
+
+    // Check if challenge is already underway and critical settings changed
+    const hasActiveModifications =
+      isStarted &&
+      (startDate !== initialStartDate ||
+        durationDays !== initialDuration ||
+        challengeName.trim() !== initialName)
+
+    if (hasActiveModifications) {
+      const confirmed = window.confirm(
+        `CRITICAL TEMPORAL WARNING:\n\nThe challenge is currently active! Modifying the duration (${initialDuration} -> ${durationDays} days), challenge name, or start date will shift what day members are on today and adjust active streak calculations.\n\nDo you want to apply these changes?`
+      )
+      if (!confirmed) return
+    }
+
+    // Check if duration shortened below existing day curriculum
+    if (existingDaysCount > 0 && durationDays < existingDaysCount) {
+      const confirmed = window.confirm(
+        `CURRICULUM WARNING:\n\nYou currently have ${existingDaysCount} challenge days created. Shortening the duration to ${durationDays} days will hide days ${durationDays + 1} to ${existingDaysCount} from members.\n\nYour existing day content will NOT be deleted, but members will only be able to view and complete days 1 to ${durationDays}.\n\nProceed with shortening?`
+      )
+      if (!confirmed) return
+    }
+
     startTransition(async () => {
       try {
-        await updateChallengeSettings(startDate || null, timezone)
-        setMsg({ type: 'success', text: 'Schedule settings updated successfully!' })
+        await updateChallengeSettings(
+          startDate || null,
+          timezone,
+          durationDays,
+          challengeName.trim() || 'Overcomer'
+        )
+        setMsg({ type: 'success', text: 'Schedule & challenge settings updated successfully!' })
       } catch (err) {
         setMsg({ type: 'error', text: err instanceof Error ? err.message : 'Update failed' })
       }
@@ -33,19 +72,25 @@ export default function ScheduleSettingsCard({
   }
 
   function handleSeed() {
-    if (!confirm('This will populate days 1 to 40 with template titles and default activities. Proceed?')) {
+    if (
+      !confirm(
+        `This will populate days 1 to ${durationDays} with template titles and default activities for "${durationDays} Days of ${challengeName.trim() || 'Overcomer'}". Proceed?`
+      )
+    ) {
       return
     }
     setMsg(null)
     startSeedTransition(async () => {
       try {
-        await seed40Days()
-        setMsg({ type: 'success', text: 'All 40 days successfully initialized!' })
+        const res = await seedChallengeDays()
+        setMsg({ type: 'success', text: `All ${res.count ?? durationDays} days successfully initialized!` })
       } catch (err) {
         setMsg({ type: 'error', text: err instanceof Error ? err.message : 'Initialization failed' })
       }
     })
   }
+
+  const renderedPreview = `${durationDays} Days of ${challengeName.trim() || 'Overcomer'}`
 
   return (
     <section className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-200 dark:border-zinc-800 transition-colors">
@@ -55,10 +100,10 @@ export default function ScheduleSettingsCard({
           <span className="text-xl">⚙️</span>
           <div>
             <h2 className="text-base font-black text-gray-900 dark:text-zinc-100">
-              Challenge Schedule &amp; Temporal Synchronization
+              Challenge Configuration &amp; Temporal Synchronization
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Define master synchronization clocks for the BBCC assembly in Ile-Ife.
+              Set challenge name, total duration, start date, and fellowship master clocks.
             </p>
           </div>
         </div>
@@ -71,7 +116,7 @@ export default function ScheduleSettingsCard({
               disabled={isSeeding}
               className="text-xs font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg shadow-sm transition"
             >
-              {isSeeding ? 'Initializing…' : '⚡ Initialize 40 Days'}
+              {isSeeding ? 'Initializing…' : `⚡ Initialize ${durationDays} Days`}
             </button>
           )}
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">
@@ -80,22 +125,79 @@ export default function ScheduleSettingsCard({
         </div>
       </div>
 
-      {/* Critical Temporal Modification Warning */}
-      <div className="mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-xl p-3.5 flex items-start gap-3">
-        <span className="text-amber-600 dark:text-amber-400 text-lg flex-shrink-0 mt-0.5">⚠️</span>
-        <div className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
-          <p className="font-bold">Critical Temporal Modification Warning</p>
-          <p className="mt-0.5 text-amber-800 dark:text-amber-300/90 font-medium">
-            Changing the start date or timezone while the 40-day challenge is actively
-            running will shift the current day index for all members and will adjust
-            universal streak calculations.
+      {/* Live Preview Badge */}
+      <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3.5 flex items-center justify-between gap-3">
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-400">
+            Dynamic Branding Live Preview
+          </span>
+          <p className="text-base font-black text-gray-900 dark:text-zinc-50 mt-0.5">
+            {renderedPreview}
+          </p>
+          <p className="text-[11px] text-amber-700 dark:text-amber-300/80 font-medium">
+            This title will appear dynamically across member dashboards, login banners, and certificates.
           </p>
         </div>
+        <span className="text-xs font-bold bg-amber-500 text-white px-3 py-1 rounded-lg shadow-sm shrink-0">
+          Preview
+        </span>
       </div>
+
+      {/* Critical Temporal Modification Warning */}
+      {isStarted && (
+        <div className="mt-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 rounded-xl p-3.5 flex items-start gap-3">
+          <span className="text-amber-600 dark:text-amber-400 text-lg flex-shrink-0 mt-0.5">⚠️</span>
+          <div className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed">
+            <p className="font-bold">Challenge In Progress</p>
+            <p className="mt-0.5 text-amber-800 dark:text-amber-300/90 font-medium">
+              The challenge has already started. Changing the duration, challenge name, or start date
+              will immediately shift the active day index for all members and alter universal streak
+              calculations.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSave} className="mt-4 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Duration Days */}
+          <div>
+            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+              Challenge Duration (Days)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              required
+              value={durationDays}
+              onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+            />
+            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
+              e.g. 21, 40, or 90 days
+            </p>
+          </div>
+
+          {/* Challenge Name */}
+          <div>
+            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
+              Challenge Theme Name
+            </label>
+            <input
+              type="text"
+              required
+              value={challengeName}
+              onChange={(e) => setChallengeName(e.target.value)}
+              placeholder="e.g. Overcomer, Purpose, Dominion"
+              className="w-full px-3.5 py-2 text-xs font-bold transition-all bg-white text-gray-900 border border-gray-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+            />
+            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
+              Forms &quot;{durationDays} Days of {challengeName.trim() || '…'}&quot;
+            </p>
+          </div>
+
           {/* Start Date */}
           <div>
             <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
@@ -133,22 +235,6 @@ export default function ScheduleSettingsCard({
               Synced to BBCC Ile-Ife Tabernacle
             </p>
           </div>
-
-          {/* Reset Time (Display only per design) */}
-          <div>
-            <label className="block text-xs font-bold text-gray-800 dark:text-zinc-200 mb-1">
-              Daily Devotional Reset Time
-            </label>
-            <input
-              type="text"
-              readOnly
-              value="00:00 WAT (Midnight)"
-              className="w-full px-3.5 py-2 text-xs font-bold bg-gray-100 dark:bg-zinc-800/60 text-gray-600 dark:text-zinc-400 border border-gray-300 dark:border-zinc-700 rounded-xl cursor-not-allowed shadow-sm"
-            />
-            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
-              Members refresh progress at this hour
-            </p>
-          </div>
         </div>
 
         {msg && (
@@ -164,18 +250,15 @@ export default function ScheduleSettingsCard({
         )}
 
         <div className="flex items-center justify-between pt-2">
-          <button
-            type="button"
-            className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200 font-medium"
-          >
-            📋 Audit Log (12 Changes)
-          </button>
+          <p className="text-[11px] text-gray-500 dark:text-zinc-400">
+            Current layout: <strong className="text-gray-800 dark:text-zinc-200">{durationDays} total days</strong>
+          </p>
           <button
             type="submit"
             disabled={isPending}
             className="px-4 py-2 bg-gray-950 dark:bg-zinc-800 hover:bg-gray-800 dark:hover:bg-zinc-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
           >
-            {isPending ? 'Saving…' : 'Save Schedule Settings'}
+            {isPending ? 'Saving…' : 'Save Challenge Settings'}
           </button>
         </div>
       </form>

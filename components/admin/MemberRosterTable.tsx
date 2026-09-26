@@ -18,9 +18,13 @@ export interface MemberRosterItem {
 
 interface MemberRosterTableProps {
   members: MemberRosterItem[]
+  durationDays?: number
 }
 
-export default function MemberRosterTable({ members }: MemberRosterTableProps) {
+export default function MemberRosterTable({
+  members,
+  durationDays = 40,
+}: MemberRosterTableProps) {
   const [search, setSearch] = useState('')
   const [selectedUnit, setSelectedUnit] = useState<string>('All')
   const [actionNotice, setActionNotice] = useState<string | null>(null)
@@ -107,7 +111,7 @@ export default function MemberRosterTable({ members }: MemberRosterTableProps) {
           <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
             {filtered.length > 0 ? (
               filtered.map((member) => {
-                const pct = Math.round((member.total_completed / 40) * 100)
+                const pct = Math.round((member.total_completed / durationDays) * 100)
                 return (
                   <tr key={member.id} className="hover:bg-gray-50/50 dark:hover:bg-zinc-800/40 transition">
                     {/* Name & Avatar */}
@@ -152,7 +156,7 @@ export default function MemberRosterTable({ members }: MemberRosterTableProps) {
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2 min-w-[120px]">
                         <span className="font-bold text-gray-900 dark:text-zinc-100 text-xs w-10">
-                          {member.total_completed}/40
+                          {member.total_completed}/{durationDays}
                         </span>
                         <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-zinc-800 overflow-hidden">
                           <div

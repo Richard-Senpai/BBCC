@@ -13,12 +13,17 @@ export default async function ProgressPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, currentDayRes, statsRes, completedDaysRes] =
+  const [profileRes, settingsRes, currentDayRes, statsRes, completedDaysRes] =
     await Promise.all([
       supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
+        .single(),
+      supabase
+        .from('challenge_settings')
+        .select('*')
+        .eq('id', 1)
         .single(),
       supabase.rpc('get_current_challenge_day'),
       supabase.rpc('get_member_stats', { member_id: user.id }),
@@ -31,6 +36,9 @@ export default async function ProgressPage() {
   const profile = profileRes.data
   if (!profile) redirect('/login')
 
+  const settings = settingsRes.data
+  const durationDays = settings?.duration_days ?? 40
+  const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
   const stats: MemberStats = (statsRes.data as MemberStats[] | null)?.[0] ?? {
     current_streak: 0,
@@ -45,7 +53,16 @@ export default async function ProgressPage() {
     })
     .filter((n): n is number => typeof n === 'number')
 
-  const pct = Math.round((stats.total_completed / 40) * 1000) / 10
+  const pct = Math.round((stats.total_completed / durationDays) * 1000) / 10
+
+  // Dynamic milestones up to durationDays
+  const milestoneCount = Math.min(6, Math.max(1, Math.floor(durationDays / 7)))
+  const step = Math.max(1, Math.floor(durationDays / milestoneCount))
+  const milestones: number[] = []
+  for (let i = 1; i < milestoneCount; i++) {
+    milestones.push(i * step)
+  }
+  milestones.push(durationDays)
 
   return (
     <>
@@ -58,7 +75,7 @@ export default async function ProgressPage() {
               My Progress
             </h1>
             <p className="text-[10px] text-gray-500 dark:text-zinc-400">
-              {profile.full_name} · BBCC 40-Day
+              {profile.full_name} · {durationDays} Days of {challengeName}
             </p>
           </div>
         </div>
@@ -87,7 +104,7 @@ export default async function ProgressPage() {
               suffix: stats.longest_run === 1 ? 'Day' : 'Days',
             },
             {
-              value: `${stats.total_completed}/40`,
+              value: `${stats.total_completed}/${durationDays}`,
               label: 'Disciplines',
               color: 'text-green-600 dark:text-green-400',
               bg: 'bg-green-50 dark:bg-green-950/30 border border-green-200/50 dark:border-green-900/40',
@@ -131,15 +148,15 @@ export default async function ProgressPage() {
           <div className="flex justify-between mt-1.5 text-[10px] text-gray-400 dark:text-zinc-500">
             <span>Day 1</span>
             <span>
-              {currentDay > 0 && currentDay <= 40
-                ? `Day ${currentDay} of 40`
-                : 'Day 40'}
+              {currentDay > 0 && currentDay <= durationDays
+                ? `Day ${currentDay} of ${durationDays}`
+                : `Day ${durationDays}`}
             </span>
           </div>
 
           {/* Milestone markers */}
           <div className="flex justify-between mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
-            {[7, 14, 21, 28, 35, 40].map((milestone) => {
+            {milestones.map((milestone) => {
               const reached = stats.total_completed >= milestone
               return (
                 <div key={milestone} className="flex flex-col items-center gap-1">
@@ -159,17 +176,19 @@ export default async function ProgressPage() {
         </div>
       </section>
 
-      {/* Full 40-Day Matrix */}
+      {/* Full Consecration Matrix */}
       <section className="px-4 mt-4">
         <ConsecrationMatrix
-          currentDay={currentDay > 0 && currentDay <= 40 ? currentDay : null}
+          currentDay={currentDay > 0 && currentDay <= durationDays ? currentDay : null}
           completedDayNumbers={completedDayNumbers}
           totalCompleted={stats.total_completed}
+          durationDays={durationDays}
+          challengeName={challengeName}
         />
       </section>
 
       {/* Certificate preview */}
-      {stats.total_completed < 40 && (
+      {stats.total_completed < durationDays && (
         <section className="px-4 mt-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 shadow-sm border border-dashed border-amber-300 dark:border-amber-600/50 transition-colors">
             <div className="flex items-center gap-3">
@@ -181,7 +200,7 @@ export default async function ProgressPage() {
                   BBCC Certificate of Consecration
                 </p>
                 <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                  Available upon Day 40 completion
+                  Available upon Day {durationDays} completion
                 </p>
               </div>
               <div className="ml-auto">

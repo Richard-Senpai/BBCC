@@ -1,7 +1,7 @@
 import BottomNav from '@/components/BottomNav'
 
 export const metadata = {
-  title: 'Community Wall | BBCC 40-Day Challenge',
+  title: 'Community Wall | BBCC Fellowship Challenge',
   description: 'Fellowship prayer wall and daily encouragement for BBCCILEIFE.',
 }
 

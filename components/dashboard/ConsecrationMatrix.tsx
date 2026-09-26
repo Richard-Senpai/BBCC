@@ -1,9 +1,13 @@
 interface ConsecrationMatrixProps {
-  /** 1–40: the active challenge day. null/0 if not started */
+  /** 1..durationDays: the active challenge day. null/0 if not started */
   currentDay: number | null
   /** Set of day numbers the user has fully completed */
   completedDayNumbers: number[]
   totalCompleted: number
+  /** Total days in challenge, default 40 */
+  durationDays?: number
+  /** Theme name, e.g. Overcomer */
+  challengeName?: string
   /** Whether to show a compact version (dashboard) vs full (progress page) */
   compact?: boolean
 }
@@ -32,8 +36,10 @@ export default function ConsecrationMatrix({
   currentDay,
   completedDayNumbers,
   totalCompleted,
+  durationDays = 40,
+  challengeName = 'Overcomer',
 }: ConsecrationMatrixProps) {
-  const days = Array.from({ length: 40 }, (_, i) => i + 1)
+  const days = Array.from({ length: durationDays }, (_, i) => i + 1)
   const completedSet = new Set(completedDayNumbers)
 
   return (
@@ -42,10 +48,10 @@ export default function ConsecrationMatrix({
       <div className="flex items-center justify-between mb-1">
         <div>
           <h3 className="font-bold text-gray-900 dark:text-zinc-100 text-sm">
-            40-Day Consecration Matrix
+            {durationDays}-Day Consecration Matrix
           </h3>
           <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
-            Visual journey from Day 1 to Day 40
+            Visual journey from Day 1 to Day {durationDays}
           </p>
         </div>
         <div className="flex flex-col items-center bg-green-50 dark:bg-green-950/40 rounded-xl px-3 py-1.5 border border-green-200/50 dark:border-green-800/40">

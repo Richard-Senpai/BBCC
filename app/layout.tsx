@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'BBCCILEIFE — 40-Day Challenge',
+  title: 'BBCCILEIFE — Consecration Challenge',
   description:
-    'A 40-day spiritual growth challenge for the Blessed Bible Church Community, Ileife.',
+    'A spiritual growth consecration challenge for the Blessed Bible Church Community, Ileife.',
 }
 
 export default function RootLayout({

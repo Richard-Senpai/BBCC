@@ -16,9 +16,10 @@ export default async function CommunityPage() {
     redirect('/login')
   }
 
-  // Parallel fetches for user profile, current day number, and initial messages
-  const [profileRes, currentDayRes, messagesRes] = await Promise.all([
+  // Parallel fetches for user profile, settings, current day number, and initial messages
+  const [profileRes, settingsRes, currentDayRes, messagesRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('challenge_settings').select('*').eq('id', 1).single(),
     supabase.rpc('get_current_challenge_day'),
     supabase
       .from('messages')
@@ -28,6 +29,9 @@ export default async function CommunityPage() {
   ])
 
   const profile = profileRes.data as Profile | null
+  const settings = settingsRes.data
+  const durationDays = settings?.duration_days ?? 40
+  const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
   const initialMessages = (messagesRes.data as unknown as MessageWithSender[]) ?? []
 
@@ -38,6 +42,8 @@ export default async function CommunityPage() {
       isAdmin={profile?.role === 'admin'}
       currentUserProfile={profile}
       currentDay={currentDay}
+      durationDays={durationDays}
+      challengeName={challengeName}
     />
   )
 }

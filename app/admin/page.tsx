@@ -99,9 +99,12 @@ export default async function AdminPage() {
     })
   )
 
+  const durationDays = settings?.duration_days ?? 40
+  const challengeName = settings?.challenge_name ?? 'Overcomer'
+
   // ── Stat calculations ──────────────────────────────────────
   const readyDaysCount = days.filter((d) => (d.activities?.length ?? 0) > 0).length
-  const readinessPct = Math.round((readyDaysCount / 40) * 100)
+  const readinessPct = Math.round((readyDaysCount / durationDays) * 100)
   const totalEnrolled = members.length
 
   const avgStreak =
@@ -115,7 +118,7 @@ export default async function AdminPage() {
   const endDateStr = (() => {
     if (!settings?.start_date) return 'Not set'
     const d = new Date(settings.start_date)
-    d.setDate(d.getDate() + 39)
+    d.setDate(d.getDate() + (durationDays - 1))
     return d.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -140,7 +143,7 @@ export default async function AdminPage() {
                 </span>
               </div>
               <p className="text-[10px] text-gray-400 dark:text-zinc-500">
-                BBCC 40-Day Challenge — Pastoral &amp; Admin Console
+                BBCC {durationDays} Days of {challengeName} — Pastoral &amp; Admin Console
               </p>
             </div>
           </div>
@@ -203,10 +206,10 @@ export default async function AdminPage() {
                 Curriculum Readiness
               </p>
               <p className="text-xl font-black text-gray-900 dark:text-zinc-100 mt-1">
-                {readyDaysCount} / 40 <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Days</span>
+                {readyDaysCount} / {durationDays} <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Days</span>
               </p>
               <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold mt-0.5">
-                ✓ {readinessPct}% Complete ({40 - readyDaysCount} Remaining)
+                ✓ {readinessPct}% Complete ({Math.max(0, durationDays - readyDaysCount)} Remaining)
               </p>
             </div>
             <div className="w-11 h-11 rounded-full bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 flex items-center justify-center font-black text-amber-700 dark:text-amber-300 text-xs">
@@ -258,7 +261,7 @@ export default async function AdminPage() {
               </p>
               <p className="text-xl font-black text-gray-900 dark:text-zinc-100 mt-1">
                 Day {currentDay > 0 ? currentDay : 0}{' '}
-                <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">of 40</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">of {durationDays}</span>
               </p>
               <p className="text-[10px] text-gray-400 dark:text-zinc-500 font-semibold mt-0.5">
                 Ends {endDateStr}
@@ -275,21 +278,27 @@ export default async function AdminPage() {
           <ScheduleSettingsCard
             settings={settings}
             hasChallengeDays={days.length > 0}
+            existingDaysCount={days.length}
           />
         </div>
 
-        {/* ── Section 2: 40-Day Curriculum Matrix & Architect ─── */}
+        {/* ── Section 2: Curriculum Matrix & Architect ─── */}
         <div className="mt-6">
           <CurriculumArchitect
             days={days}
             completionCounts={completionCounts}
             startDate={settings?.start_date ?? null}
+            durationDays={durationDays}
+            challengeName={challengeName}
           />
         </div>
 
         {/* ── Section 3: Fellowship Member Roster ──────────────── */}
         <div className="mt-6">
-          <MemberRosterTable members={rosterItems} />
+          <MemberRosterTable
+            members={rosterItems}
+            durationDays={durationDays}
+          />
         </div>
       </div>
     </main>

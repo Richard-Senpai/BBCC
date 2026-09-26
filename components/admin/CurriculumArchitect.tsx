@@ -8,12 +8,16 @@ interface CurriculumArchitectProps {
   days: ChallengeDayWithActivities[]
   completionCounts: DayCompletionCount[]
   startDate: string | null
+  durationDays?: number
+  challengeName?: string
 }
 
 export default function CurriculumArchitect({
   days,
   completionCounts,
   startDate,
+  durationDays = 40,
+  challengeName = 'Overcomer',
 }: CurriculumArchitectProps) {
   // Map days by day_number for instant lookup
   const dayMap = new Map<number, ChallengeDayWithActivities>()
@@ -151,7 +155,7 @@ export default function CurriculumArchitect({
   })()
 
   // Calculate overall publishing counts
-  const publishedCount = Array.from({ length: 40 }, (_, i) => i + 1).filter(
+  const publishedCount = Array.from({ length: durationDays }, (_, i) => i + 1).filter(
     (n) => dayMap.has(n) && (dayMap.get(n)?.activities?.length ?? 0) > 0
   ).length
 
@@ -163,10 +167,10 @@ export default function CurriculumArchitect({
           <span className="text-xl">🏛️</span>
           <div>
             <h2 className="text-base font-black text-gray-900 dark:text-zinc-100">
-              40-Day Curriculum Matrix &amp; Content Architect
+              {durationDays}-Day Curriculum Matrix &amp; Content Architect
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Tap any day node to inspect details or preview publishing readiness.
+              Tap any day node to inspect details or preview publishing readiness for {durationDays} Days of {challengeName}.
             </p>
           </div>
         </div>
@@ -183,7 +187,7 @@ export default function CurriculumArchitect({
           </span>
           <span className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
             <span className="w-2.5 h-2.5 rounded-full border border-dashed border-gray-400 dark:border-zinc-500 inline-block" />
-            Needs Content ({40 - publishedCount})
+            Needs Content ({Math.max(0, durationDays - publishedCount)})
           </span>
         </div>
       </div>
@@ -194,14 +198,14 @@ export default function CurriculumArchitect({
         <div className="lg:col-span-5 bg-gray-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-gray-800 dark:text-zinc-200 uppercase tracking-wider">
-              Cohort Full Roadmap (Days 1 — 40)
+              Cohort Full Roadmap (Days 1 — {durationDays})
             </span>
             <span className="text-[10px] text-gray-400 dark:text-zinc-500">Click node to edit</span>
           </div>
 
-          {/* 40 nodes: 5 on mobile, 8 on sm */}
+          {/* Grid nodes */}
           <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
-            {Array.from({ length: 40 }, (_, i) => i + 1).map((num) => {
+            {Array.from({ length: durationDays }, (_, i) => i + 1).map((num) => {
               const day = dayMap.get(num)
               const hasContent = day && (day.activities?.length ?? 0) > 0
               const isSelected = num === selectedDayNum
@@ -254,7 +258,7 @@ export default function CurriculumArchitect({
 
           <div className="mt-4 pt-3 border-t border-gray-200/70 dark:border-zinc-800 flex items-center justify-between text-[11px] text-gray-500 dark:text-zinc-400 font-medium">
             <span>✓ {publishedCount} Published to congregation</span>
-            <span>{40 - publishedCount} drafts needed</span>
+            <span>{Math.max(0, durationDays - publishedCount)} drafts needed</span>
           </div>
         </div>
 

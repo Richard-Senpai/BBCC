@@ -10,8 +10,12 @@ import type {
   Profile,
   ChallengeSettings,
   ChallengeDayWithActivities,
+  Activity,
   MemberStats,
 } from '@/lib/types'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 // ─────────────────────────────────────────
 // Helpers
@@ -39,9 +43,17 @@ function getDayOfWeek(timezone = 'Africa/Lagos'): string {
 }
 
 function getNextMilestone(
-  currentDay: number
+  currentDay: number,
+  durationDays = 40
 ): { day: number; daysLeft: number } | null {
-  const milestones = [7, 14, 21, 28, 35, 40]
+  const count = Math.min(6, Math.max(1, Math.floor(durationDays / 7)))
+  const step = Math.max(1, Math.floor(durationDays / count))
+  const milestones: number[] = []
+  for (let i = 1; i < count; i++) {
+    milestones.push(i * step)
+  }
+  milestones.push(durationDays)
+
   const next = milestones.find((m) => m > currentDay)
   if (!next) return null
   return { day: next, daysLeft: next - currentDay }
@@ -54,9 +66,13 @@ function getNextMilestone(
 function NotStartedView({
   profile,
   settings,
+  durationDays,
+  challengeName,
 }: {
   profile: Profile
   settings: ChallengeSettings | null
+  durationDays: number
+  challengeName: string
 }) {
   const firstName = profile.full_name.split(' ')[0]
   return (
@@ -66,7 +82,7 @@ function NotStartedView({
         Challenge not started yet
       </h1>
       <p className="text-gray-500 dark:text-zinc-400 text-sm mb-1">
-        Welcome, {firstName}! The 40-Day Consecration will begin once your
+        Welcome, {firstName}! The {durationDays} Days of {challengeName} will begin once your
         pastor sets the start date.
       </p>
       {settings?.start_date && (
@@ -84,7 +100,15 @@ function NotStartedView({
   )
 }
 
-function CompletedView({ profile }: { profile: Profile }) {
+function CompletedView({
+  profile,
+  durationDays,
+  challengeName,
+}: {
+  profile: Profile
+  durationDays: number
+  challengeName: string
+}) {
   const firstName = profile.full_name.split(' ')[0]
   return (
     <div className="px-4 py-12 text-center">
@@ -93,7 +117,7 @@ function CompletedView({ profile }: { profile: Profile }) {
         Glory to God, {firstName}!
       </h1>
       <p className="text-gray-600 dark:text-zinc-400 text-sm">
-        You have completed the 40-Day Consecration Challenge. Your certificate
+        You have completed the {durationDays} Days of {challengeName} Challenge. Your certificate
         of consecration will be issued soon.
       </p>
     </div>
@@ -136,20 +160,33 @@ export default async function DashboardPage() {
 
   const timezone = settings?.timezone ?? 'Africa/Lagos'
 
+  const durationDays = settings?.duration_days ?? 40
+  const challengeName = settings?.challenge_name ?? 'Overcomer'
+  const challengeTitle = `${durationDays} Days of ${challengeName}`
+
   // ── Determine phase ────────────────────────────────────────
   if (currentDay === 0) {
     return (
       <>
-        <DashboardHeader profile={profile} streak={0} />
-        <NotStartedView profile={profile} settings={settings} />
+        <DashboardHeader profile={profile} streak={0} challengeTitle={challengeTitle} />
+        <NotStartedView
+          profile={profile}
+          settings={settings}
+          durationDays={durationDays}
+          challengeName={challengeName}
+        />
       </>
     )
   }
-  if (currentDay === 41) {
+  if (currentDay > durationDays) {
     return (
       <>
-        <DashboardHeader profile={profile} streak={0} />
-        <CompletedView profile={profile} />
+        <DashboardHeader profile={profile} streak={0} challengeTitle={challengeTitle} />
+        <CompletedView
+          profile={profile}
+          durationDays={durationDays}
+          challengeName={challengeName}
+        />
       </>
     )
   }
@@ -159,7 +196,7 @@ export default async function DashboardPage() {
     await Promise.all([
       supabase
         .from('challenge_days')
-        .select('*, activities(id, challenge_day_id, description, sort_order)')
+        .select('*')
         .eq('day_number', currentDay)
         .maybeSingle(),
       supabase
@@ -173,7 +210,29 @@ export default async function DashboardPage() {
         .eq('user_id', user.id),
     ])
 
-  const todayChallenge = challengeRes.data
+  const dayRow = challengeRes.data
+  let activities: Activity[] = []
+
+  if (dayRow?.id) {
+    const { data: actData, error: actError } = await supabase
+      .from('activities')
+      .select('id, challenge_day_id, description, sort_order')
+      .eq('challenge_day_id', dayRow.id)
+      .order('sort_order', { ascending: true })
+
+    if (actError) {
+      console.error(`[Dashboard] Error loading activities for day ${currentDay} (${dayRow.id}):`, actError)
+    } else {
+      activities = actData ?? []
+    }
+  }
+
+  const todayChallenge: ChallengeDayWithActivities | null = dayRow
+    ? {
+        ...dayRow,
+        activities,
+      }
+    : null
   const completedActivityIds = (activityCompRes.data ?? []).map(
     (c) => c.activity_id
   )
@@ -192,8 +251,8 @@ export default async function DashboardPage() {
     .filter((n): n is number => typeof n === 'number')
 
   const isDayComplete = completedDayNumbers.includes(currentDay)
-  const pct = Math.round((stats.total_completed / 40) * 100 * 10) / 10
-  const nextMilestone = getNextMilestone(currentDay)
+  const pct = Math.round((stats.total_completed / durationDays) * 100 * 10) / 10
+  const nextMilestone = getNextMilestone(currentDay, durationDays)
   const greeting = getGreeting(timezone)
   const dayOfWeek = getDayOfWeek(timezone)
   const firstName = profile.full_name.split(' ')[0]
@@ -201,7 +260,7 @@ export default async function DashboardPage() {
   return (
     <>
       {/* ── Header ─────────────────────────────────────────── */}
-      <DashboardHeader profile={profile} streak={stats.current_streak} />
+      <DashboardHeader profile={profile} streak={stats.current_streak} challengeTitle={challengeTitle} />
 
       {/* ── Greeting with Avatar ────────────────────────────── */}
       <section className="px-4 mt-3">
@@ -232,7 +291,7 @@ export default async function DashboardPage() {
       <section className="px-4 mt-3.5">
         <div className="flex items-center justify-between text-sm font-semibold mb-1.5">
           <span className="text-gray-800 dark:text-zinc-200">
-            Day <span className="text-amber-600 dark:text-amber-400">{currentDay}</span> of 40
+            Day <span className="text-amber-600 dark:text-amber-400">{currentDay}</span> of {durationDays}
           </span>
           <span className="text-amber-600 dark:text-amber-400">{pct}% Completed</span>
         </div>
@@ -243,7 +302,7 @@ export default async function DashboardPage() {
           />
         </div>
         <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5 flex items-center gap-1 flex-wrap">
-          <span>{stats.total_completed} of 40 days completed</span>
+          <span>{stats.total_completed} of {durationDays} days completed</span>
           {nextMilestone && (
             <>
               <span>·</span>
@@ -322,12 +381,14 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* ── 40-Day Matrix ────────────────────────────────────── */}
+      {/* ── Consecration Matrix ────────────────────────────── */}
       <section className="px-4 mt-4">
         <ConsecrationMatrix
           currentDay={currentDay}
           completedDayNumbers={completedDayNumbers}
           totalCompleted={stats.total_completed}
+          durationDays={durationDays}
+          challengeName={challengeName}
         />
       </section>
 
@@ -360,9 +421,11 @@ export default async function DashboardPage() {
 function DashboardHeader({
   profile,
   streak,
+  challengeTitle,
 }: {
   profile: Profile
   streak: number
+  challengeTitle?: string
 }) {
   return (
     <header className="px-4 pt-5 pb-2 flex items-center justify-between">
@@ -370,7 +433,7 @@ function DashboardHeader({
       <div className="flex items-center gap-2">
         <BBCCLogo size="sm" />
         <div className="leading-tight">
-          <p className="text-xs font-black text-gray-900 dark:text-zinc-100">BBCC 40-Day</p>
+          <p className="text-xs font-black text-gray-900 dark:text-zinc-100">{challengeTitle ?? 'BBCC Consecration'}</p>
           <p className="text-[10px] text-gray-500 dark:text-zinc-400">Believers&apos; Banquet</p>
         </div>
       </div>

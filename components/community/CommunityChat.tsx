@@ -15,6 +15,8 @@ interface CommunityChatProps {
   isAdmin: boolean
   currentUserProfile: Profile | null
   currentDay: number
+  durationDays?: number
+  challengeName?: string
 }
 
 function formatTime(isoString: string): string {
@@ -53,6 +55,8 @@ export default function CommunityChat({
   isAdmin,
   currentUserProfile,
   currentDay,
+  durationDays = 40,
+  challengeName = 'Overcomer',
 }: CommunityChatProps) {
   const [messages, setMessages] = useState<MessageWithSender[]>(initialMessages)
   const [text, setText] = useState('')
@@ -277,7 +281,7 @@ export default function CommunityChat({
                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse" />
               </h1>
               <p className="text-[10px] text-gray-500 dark:text-zinc-400">
-                Day {currentDay > 0 ? currentDay : 1} of 40 · Corporate Encouragement
+                Day {currentDay > 0 ? currentDay : 1} of {durationDays} · Corporate Encouragement
               </p>
             </div>
           </div>
@@ -334,7 +338,7 @@ export default function CommunityChat({
               Welcome to the Fellowship Wall!
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5 leading-relaxed max-w-xs mx-auto">
-              No messages yet. Share a prayer request, testimony, or note of encouragement with the brethren as we journey through the 40 days together.
+              No messages yet. Share a prayer request, testimony, or note of encouragement with the brethren as we journey through the {durationDays} days together.
             </p>
           </div>
         ) : (

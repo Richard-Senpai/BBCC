@@ -12,10 +12,11 @@ export default async function LeaderboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Parallel fetches: current day, top leaderboard (up to 10), and current user metrics
-  const [currentDayRes, leaderboardRes, userProfileRes, userStatsRes] =
+  // Parallel fetches: current day, settings, top leaderboard (up to 10), and current user metrics
+  const [currentDayRes, settingsRes, leaderboardRes, userProfileRes, userStatsRes] =
     await Promise.all([
       supabase.rpc('get_current_challenge_day'),
+      supabase.from('challenge_settings').select('*').eq('id', 1).single(),
       supabase.rpc('get_leaderboard', { limit_count: 10 }),
       user
         ? supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -25,6 +26,9 @@ export default async function LeaderboardPage() {
         : Promise.resolve({ data: null }),
     ])
 
+  const settings = settingsRes.data
+  const durationDays = settings?.duration_days ?? 40
+  const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
   const leaderboard: LeaderboardEntry[] = (leaderboardRes.data as LeaderboardEntry[] | null) ?? []
   const userProfile = userProfileRes.data as Profile | null
@@ -59,7 +63,7 @@ export default async function LeaderboardPage() {
             </h1>
             <p className="text-[10px] text-gray-500 dark:text-zinc-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              Day {currentDay > 0 ? currentDay : 1} of 40 · Corporate Consecration
+              Day {currentDay > 0 ? currentDay : 1} of {durationDays} · Corporate Consecration
             </p>
           </div>
         </div>
@@ -169,7 +173,7 @@ export default async function LeaderboardPage() {
                 🔥 {top1.current_streak} {top1.current_streak === 1 ? 'Day' : 'Days'} Streak
               </span>
               <span className="text-xs font-bold text-green-700 dark:text-green-400">
-                {top1.total_completed}/40 Disciplines Done
+                {top1.total_completed}/{durationDays} Disciplines Done
               </span>
             </div>
           </div>
@@ -283,7 +287,7 @@ export default async function LeaderboardPage() {
               <span className="flex items-center gap-1 font-bold text-amber-400">
                 🔥 {userStats.current_streak}-Day Streak
               </span>
-              <span>{userStats.total_completed} of 40 Tasks Completed</span>
+              <span>{userStats.total_completed} of {durationDays} Tasks Completed</span>
             </div>
 
             <Link
@@ -385,16 +389,16 @@ export default async function LeaderboardPage() {
             </p>
           </div>
 
-          {/* 40-Day */}
+          {/* Final Crown Seal */}
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-3 border border-gray-200 dark:border-zinc-800 opacity-80">
             <div className="flex items-center justify-between">
               <span className="text-lg">🎖️</span>
               <span className="text-[10px] font-bold bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 px-1.5 py-0.5 rounded-full">
-                Final Crown
+                {userStats.total_completed >= durationDays ? 'Completed' : 'Final Crown'}
               </span>
             </div>
             <p className="font-bold text-xs text-gray-900 dark:text-zinc-100 mt-2">
-              40-Day Overcomer
+              {durationDays}-Day {challengeName}
             </p>
             <p className="text-[10px] text-gray-500 dark:text-zinc-400 mt-0.5">
               Full Corporate Measure

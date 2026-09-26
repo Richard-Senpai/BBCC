@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -12,6 +12,29 @@ export default function SignupPage() {
   const router = useRouter()
 
   const [tab, setTab] = useState<'register' | 'login'>('register')
+
+  // Dynamic branding state
+  const [challengeBranding, setChallengeBranding] = useState({
+    duration_days: 40,
+    challenge_name: 'Overcomer',
+  })
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('challenge_settings')
+      .select('duration_days, challenge_name')
+      .eq('id', 1)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setChallengeBranding({
+            duration_days: data.duration_days ?? 40,
+            challenge_name: data.challenge_name ?? 'Overcomer',
+          })
+        }
+      })
+  }, [])
 
   // Register state
   const [fullName, setFullName] = useState('')
@@ -153,7 +176,7 @@ export default function SignupPage() {
           Believers&apos; Banquet Christian Centre
         </h1>
         <p className="text-amber-600 dark:text-amber-400 text-sm font-semibold mt-0.5">
-          40 Days of Consecration &amp; Spiritual Discipline
+          {challengeBranding.duration_days} Days of {challengeBranding.challenge_name}
         </p>
       </div>
 
@@ -245,7 +268,7 @@ export default function SignupPage() {
                 type="submit" disabled={loading}
                 className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 dark:disabled:bg-amber-800 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition"
               >
-                🚩 {loading ? 'Creating account…' : 'Enlist for 40-Day Challenge'}
+                🚩 {loading ? 'Creating account…' : `Enlist for ${challengeBranding.duration_days} Days of ${challengeBranding.challenge_name}`}
               </button>
 
               <p className="text-[10px] text-gray-400 dark:text-zinc-500 text-center">
