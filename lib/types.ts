@@ -35,6 +35,7 @@ export type Activity = {
   challenge_day_id: string
   description: string
   sort_order: number
+  video_url?: string | null
 }
 
 export type Completion = {
@@ -173,12 +174,14 @@ export type Database = {
           challenge_day_id: string
           description?: string
           sort_order?: number
+          video_url?: string | null
         }
         Update: {
           id?: string
           challenge_day_id?: string
           description?: string
           sort_order?: number
+          video_url?: string | null
         }
         Relationships: [
           {

@@ -62,6 +62,20 @@ export async function updateChallengeSettings(
 }
 
 /**
+ * Validate that a URL is a valid http:// or https:// web URL.
+ * Rejects javascript:, data:, file:, relative, or malformed URLs.
+ */
+function isValidHttpUrl(urlString: string): boolean {
+  if (!urlString || !urlString.trim()) return true
+  try {
+    const url = new URL(urlString.trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/**
  * Save day content and its associated activities.
  */
 export async function saveChallengeDay(params: {
@@ -69,10 +83,21 @@ export async function saveChallengeDay(params: {
   title: string
   description: string
   scriptureReference: string
-  activities: { id?: string; description: string; sort_order: number }[]
+  activities: { id?: string; description: string; sort_order: number; video_url?: string | null }[]
 }) {
   const { supabase } = await assertAdmin()
   const { dayNumber, title, description, scriptureReference, activities } = params
+
+  // Strictly validate all activity video URLs
+  for (let i = 0; i < activities.length; i++) {
+    const act = activities[i]
+    const vUrl = act.video_url?.trim()
+    if (vUrl && !isValidHttpUrl(vUrl)) {
+      throw new Error(
+        `Invalid video URL "${vUrl}" on activity #${i + 1}: must be a valid web link starting with http:// or https://`
+      )
+    }
+  }
 
   // 1. Upsert challenge_day
   const { data: dayRow, error: dayError } = await supabase
@@ -125,12 +150,15 @@ export async function saveChallengeDay(params: {
   // 4. Upsert/insert activities with strict error verification
   for (let i = 0; i < activities.length; i++) {
     const act = activities[i]
+    const videoUrlToSave = act.video_url?.trim() || null
+
     if (act.id && existingIds.has(act.id)) {
       const { error: updError } = await supabase
         .from('activities')
         .update({
           description: act.description.trim(),
           sort_order: i + 1,
+          video_url: videoUrlToSave,
         })
         .eq('id', act.id)
 
@@ -143,6 +171,7 @@ export async function saveChallengeDay(params: {
         challenge_day_id: dayId,
         description: act.description.trim(),
         sort_order: i + 1,
+        video_url: videoUrlToSave,
       })
 
       if (insError) {
