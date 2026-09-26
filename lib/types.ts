@@ -8,6 +8,7 @@ export type Profile = {
   fellowship_unit: string
   role: UserRole
   avatar_url?: string | null
+  last_seen_announcements_at?: string | null
   created_at: string
 }
 
@@ -81,7 +82,8 @@ export type ChallengeDayWithActivities = ChallengeDay & {
 export type Message = {
   id: string
   user_id: string | null
-  content: string
+  content: string | null
+  image_url?: string | null
   created_at: string
 }
 
@@ -92,6 +94,22 @@ export type MessageWithSender = Message & {
     avatar_url?: string | null
     fellowship_unit: string
     role: UserRole
+  } | null
+}
+
+export type Announcement = {
+  id: string
+  title: string
+  body: string
+  created_by: string | null
+  created_at: string
+}
+
+export type AnnouncementWithAuthor = Announcement & {
+  profiles?: {
+    full_name: string
+    avatar_url?: string | null
+    role?: UserRole
   } | null
 }
 
@@ -111,6 +129,7 @@ export type Database = {
           fellowship_unit?: string
           role?: UserRole
           avatar_url?: string | null
+          last_seen_announcements_at?: string | null
           created_at?: string
         }
         Update: {
@@ -121,6 +140,7 @@ export type Database = {
           fellowship_unit?: string
           role?: UserRole
           avatar_url?: string | null
+          last_seen_announcements_at?: string | null
           created_at?: string
         }
         Relationships: []
@@ -260,19 +280,47 @@ export type Database = {
         Insert: {
           id?: string
           user_id?: string | null
-          content: string
+          content?: string | null
+          image_url?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string | null
-          content?: string
+          content?: string | null
+          image_url?: string | null
           created_at?: string
         }
         Relationships: [
           {
             foreignKeyName: 'messages_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      announcements: {
+        Row: Announcement
+        Insert: {
+          id?: string
+          title: string
+          body: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          body?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'announcements_created_by_fkey'
+            columns: ['created_by']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']
