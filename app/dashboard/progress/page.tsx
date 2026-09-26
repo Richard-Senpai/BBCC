@@ -3,8 +3,9 @@ import { Flame, TrendingUp, CheckCheck, Award, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
+import AnnouncementBell from '@/components/AnnouncementBell'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
-import type { MemberStats } from '@/lib/types'
+import type { MemberStats, Profile } from '@/lib/types'
 
 export default async function ProgressPage() {
   const supabase = await createClient()
@@ -34,8 +35,23 @@ export default async function ProgressPage() {
         .eq('user_id', user.id),
     ])
 
-  const profile = profileRes.data
+  const profile = profileRes.data as Profile | null
   if (!profile) redirect('/login')
+
+  // Calculate unread announcements
+  let unreadCount = 0
+  if (profile.last_seen_announcements_at) {
+    const { count } = await supabase
+      .from('announcements')
+      .select('*', { count: 'exact', head: true })
+      .gt('created_at', profile.last_seen_announcements_at)
+    unreadCount = count ?? 0
+  } else {
+    const { count } = await supabase
+      .from('announcements')
+      .select('*', { count: 'exact', head: true })
+    unreadCount = count ?? 0
+  }
 
   const settings = settingsRes.data
   const durationDays = settings?.duration_days ?? 40
@@ -82,6 +98,7 @@ export default async function ProgressPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <AnnouncementBell unreadCount={unreadCount} />
           <ThemeToggle />
         </div>
       </header>

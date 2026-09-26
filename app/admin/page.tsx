@@ -16,11 +16,13 @@ import LogoutButton from '@/components/LogoutButton'
 import ScheduleSettingsCard from '@/components/admin/ScheduleSettingsCard'
 import CurriculumArchitect from '@/components/admin/CurriculumArchitect'
 import MemberRosterTable, { type MemberRosterItem } from '@/components/admin/MemberRosterTable'
+import AnnouncementManager from '@/components/admin/AnnouncementManager'
 import type {
   Profile,
   ChallengeSettings,
   ChallengeDayWithActivities,
   DayCompletionCount,
+  AnnouncementWithAuthor,
 } from '@/lib/types'
 
 export default async function AdminPage() {
@@ -50,6 +52,7 @@ export default async function AdminPage() {
     currentDayRes,
     membersRes,
     completionsRes,
+    announcementsRes,
   ] = await Promise.all([
     supabase.from('challenge_settings').select('*').eq('id', 1).single(),
     supabase
@@ -66,6 +69,10 @@ export default async function AdminPage() {
     supabase
       .from('completions')
       .select('user_id, challenge_day_id, completed_at'),
+    supabase
+      .from('announcements')
+      .select('id, title, body, created_by, created_at, profiles(full_name, avatar_url, role)')
+      .order('created_at', { ascending: false }),
   ])
 
   const settings: ChallengeSettings | null = settingsRes.data
@@ -79,6 +86,7 @@ export default async function AdminPage() {
   const currentDay = (currentDayRes.data as number) ?? 0
   const members: Profile[] = membersRes.data ?? []
   const allCompletions = completionsRes.data ?? []
+  const announcements: AnnouncementWithAuthor[] = (announcementsRes.data as unknown as AnnouncementWithAuthor[]) ?? []
 
   // Calculate Member Roster details
   const rosterItems: MemberRosterItem[] = await Promise.all(
@@ -201,13 +209,13 @@ export default async function AdminPage() {
               <BarChart3 size={13} strokeWidth={1.75} />
               <span>Export Analytics</span>
             </button>
-            <button
-              type="button"
+            <a
+              href="#announcement-manager"
               className="text-xs font-medium text-white bg-[var(--flame-accent)] hover:opacity-95 px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
               <Megaphone size={13} strokeWidth={1.75} />
               <span>Broadcast Notice</span>
-            </button>
+            </a>
           </div>
         </div>
 
@@ -294,6 +302,11 @@ export default async function AdminPage() {
             hasChallengeDays={days.length > 0}
             existingDaysCount={days.length}
           />
+        </div>
+
+        {/* ── Section: Church Announcements & Broadcasts ────────── */}
+        <div className="mt-6">
+          <AnnouncementManager initialAnnouncements={announcements} />
         </div>
 
         {/* ── Section 2: Curriculum Matrix & Architect ─── */}

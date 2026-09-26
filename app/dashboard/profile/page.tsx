@@ -5,7 +5,8 @@ import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import AvatarUploader from '@/components/profile/AvatarUploader'
-import type { Profile, MemberStats } from '@/lib/types'
+import AnnouncementsSection from '@/components/profile/AnnouncementsSection'
+import type { Profile, MemberStats, AnnouncementWithAuthor } from '@/lib/types'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -14,7 +15,7 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, settingsRes, statsRes] = await Promise.all([
+  const [profileRes, settingsRes, statsRes, announcementsRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('*')
@@ -26,6 +27,10 @@ export default async function ProfilePage() {
       .eq('id', 1)
       .single(),
     supabase.rpc('get_member_stats', { member_id: user.id }),
+    supabase
+      .from('announcements')
+      .select('id, title, body, created_by, created_at, profiles(full_name, avatar_url, role)')
+      .order('created_at', { ascending: false }),
   ])
 
   const profile = profileRes.data
@@ -34,6 +39,7 @@ export default async function ProfilePage() {
   const settings = settingsRes.data
   const durationDays = settings?.duration_days ?? 40
   const challengeName = settings?.challenge_name ?? 'Overcomer'
+  const announcements = (announcementsRes.data as unknown as AnnouncementWithAuthor[]) ?? []
 
   const stats: MemberStats = (statsRes.data as MemberStats[] | null)?.[0] ?? {
     current_streak: 0,
@@ -159,6 +165,12 @@ export default async function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* Announcements */}
+      <AnnouncementsSection
+        announcements={announcements}
+        lastSeenAt={profile.last_seen_announcements_at}
+      />
 
       {/* Sign out */}
       <section className="px-4 mt-4">

@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { Bell, Flame, Crown, Shield, Award, BookOpen, Lock } from 'lucide-react'
+import { Flame, Crown, Shield, Award, BookOpen, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import UserAvatar from '@/components/UserAvatar'
 import ThemeToggle from '@/components/ThemeToggle'
+import AnnouncementBell from '@/components/AnnouncementBell'
 import type { LeaderboardEntry, Profile, MemberStats } from '@/lib/types'
 
 export default async function LeaderboardPage() {
@@ -14,7 +15,7 @@ export default async function LeaderboardPage() {
   } = await supabase.auth.getUser()
 
   // Parallel fetches: current day, settings, top leaderboard (up to 10), and current user metrics
-  const [currentDayRes, settingsRes, leaderboardRes, userProfileRes, userStatsRes] =
+  const [currentDayRes, settingsRes, leaderboardRes, userProfileRes, userStatsRes, userActivitiesRes] =
     await Promise.all([
       supabase.rpc('get_current_challenge_day'),
       supabase.from('challenge_settings').select('*').eq('id', 1).single(),
@@ -25,6 +26,12 @@ export default async function LeaderboardPage() {
       user
         ? supabase.rpc('get_member_stats', { member_id: user.id })
         : Promise.resolve({ data: null }),
+      user
+        ? supabase
+            .from('activity_completions')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+        : Promise.resolve({ count: 0 }),
     ])
 
   const settings = settingsRes.data
@@ -38,12 +45,13 @@ export default async function LeaderboardPage() {
     longest_run: 0,
     total_completed: 0,
   }
+  const userActivitiesCount = userActivitiesRes.count ?? 0
 
   // Find user's rank in leaderboard or calculate
   const userRankEntry = userProfile
     ? leaderboard.find((entry) => entry.id === userProfile.id)
     : null
-  const userRank = userRankEntry?.rank ?? (userStats.current_streak > 0 ? 4 : null)
+  const userRank = userRankEntry?.rank ?? (userActivitiesCount > 0 ? 4 : null)
 
   const top1 = leaderboard[0] ?? null
   const top2 = leaderboard[1] ?? null
@@ -51,6 +59,23 @@ export default async function LeaderboardPage() {
   const runnersUp = leaderboard.slice(3)
 
   const currentWeek = currentDay > 0 ? Math.ceil(currentDay / 7) : 1
+
+  // Calculate unread announcements
+  let unreadCount = 0
+  if (userProfile) {
+    if (userProfile.last_seen_announcements_at) {
+      const { count } = await supabase
+        .from('announcements')
+        .select('*', { count: 'exact', head: true })
+        .gt('created_at', userProfile.last_seen_announcements_at)
+      unreadCount = count ?? 0
+    } else {
+      const { count } = await supabase
+        .from('announcements')
+        .select('*', { count: 'exact', head: true })
+      unreadCount = count ?? 0
+    }
+  }
 
   return (
     <div className="px-4 pt-5 pb-8">
@@ -71,13 +96,7 @@ export default async function LeaderboardPage() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-ink)] transition"
-          >
-            <Bell size={15} strokeWidth={1.75} />
-          </button>
+          <AnnouncementBell unreadCount={unreadCount} />
         </div>
       </header>
 
@@ -172,12 +191,12 @@ export default async function LeaderboardPage() {
             </div>
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-hairline)]">
+              <span className="text-xs text-[var(--olive-accent)] font-semibold">
+                {top1.total_completed} Activities Done
+              </span>
               <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--flame-accent)]">
                 <Flame size={13} strokeWidth={1.75} />
                 {top1.current_streak} {top1.current_streak === 1 ? 'Day' : 'Days'} Streak
-              </span>
-              <span className="text-xs text-[var(--olive-accent)] font-medium">
-                {top1.total_completed}/{durationDays} Disciplines
               </span>
             </div>
           </div>
@@ -210,12 +229,12 @@ export default async function LeaderboardPage() {
                   {top2.fellowship_unit || 'General Assembly'}
                 </p>
                 <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-[var(--olive-accent)]">
+                    {top2.total_completed} Done
+                  </span>
                   <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
                     <Flame size={11} strokeWidth={1.75} />
                     {top2.current_streak}d
-                  </span>
-                  <span className="text-[var(--text-muted)] font-normal">
-                    {top2.total_completed} Done
                   </span>
                 </div>
               </div>
@@ -241,12 +260,12 @@ export default async function LeaderboardPage() {
                   {top3.fellowship_unit || 'General Assembly'}
                 </p>
                 <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-[var(--olive-accent)]">
+                    {top3.total_completed} Done
+                  </span>
                   <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
                     <Flame size={11} strokeWidth={1.75} />
                     {top3.current_streak}d
-                  </span>
-                  <span className="text-[var(--text-muted)] font-normal">
-                    {top3.total_completed} Done
                   </span>
                 </div>
               </div>
@@ -290,11 +309,13 @@ export default async function LeaderboardPage() {
             </div>
 
             <div className="bg-[var(--bg-subtle)] rounded-lg p-2.5 mt-3 flex items-center justify-between text-xs text-[var(--text-muted)] border border-[var(--border-hairline)]">
+              <span className="font-semibold text-[var(--olive-accent)]">
+                {userActivitiesCount} Activities Completed
+              </span>
               <span className="flex items-center gap-1 font-medium text-[var(--flame-accent)]">
                 <Flame size={13} strokeWidth={1.75} />
                 {userStats.current_streak}-Day Streak
               </span>
-              <span>{userStats.total_completed} of {durationDays} Disciplines</span>
             </div>
 
             <Link
@@ -452,7 +473,7 @@ export default async function LeaderboardPage() {
                       {member.full_name}
                     </p>
                     <p className="text-[10px] text-[var(--text-muted)]">
-                      {member.fellowship_unit || 'General Assembly'} / {member.total_completed} Disciplines
+                      {member.fellowship_unit || 'General Assembly'} · <span className="font-semibold text-[var(--olive-accent)]">{member.total_completed}</span> Done
                     </p>
                   </div>
                 </div>

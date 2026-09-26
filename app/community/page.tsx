@@ -23,7 +23,7 @@ export default async function CommunityPage() {
     supabase.rpc('get_current_challenge_day'),
     supabase
       .from('messages')
-      .select('id, user_id, content, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role)')
+      .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role)')
       .order('created_at', { ascending: true })
       .limit(150),
   ])
@@ -33,7 +33,25 @@ export default async function CommunityPage() {
   const durationDays = settings?.duration_days ?? 40
   const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
-  const initialMessages = (messagesRes.data as unknown as MessageWithSender[]) ?? []
+
+  let initialMessages: MessageWithSender[] = []
+  if (messagesRes.data) {
+    initialMessages = messagesRes.data as unknown as MessageWithSender[]
+  } else if (messagesRes.error) {
+    console.error('CommunityPage messages query error:', messagesRes.error)
+    // Fallback: try querying without profile join to ensure user still sees messages
+    const fallbackRes = await supabase
+      .from('messages')
+      .select('id, user_id, content, image_url, created_at')
+      .order('created_at', { ascending: true })
+      .limit(150)
+    if (fallbackRes.data) {
+      initialMessages = fallbackRes.data.map((m) => ({
+        ...m,
+        profiles: null,
+      })) as unknown as MessageWithSender[]
+    }
+  }
 
   return (
     <CommunityChat

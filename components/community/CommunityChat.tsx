@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Sparkles, MessageSquare, Send, Trash2, Loader2 } from 'lucide-react'
+import { Sparkles, MessageSquare, Send, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { postMessage, deleteMessage } from '@/lib/actions/messages'
 import UserAvatar from '@/components/UserAvatar'
@@ -61,22 +61,51 @@ export default function CommunityChat({
 }: CommunityChatProps) {
   const [messages, setMessages] = useState<MessageWithSender[]>(initialMessages)
   const [text, setText] = useState('')
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [, setIsUploadingImage] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior })
   }
 
-  // Scroll to bottom on initial mount
+  // 1. Fetch complete message history from Supabase on mount (guarantees history persists across sessions)
   useEffect(() => {
-    scrollToBottom('auto')
+    async function loadMessageHistory() {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role)')
+        .order('created_at', { ascending: true })
+        .limit(200)
+
+      if (data) {
+        setMessages(data as unknown as MessageWithSender[])
+        setTimeout(() => scrollToBottom('auto'), 50)
+      } else if (error) {
+        console.warn('Initial joined messages query returned error, trying fallback:', error.message)
+        const fallbackRes = await supabase
+          .from('messages')
+          .select('id, user_id, content, image_url, created_at')
+          .order('created_at', { ascending: true })
+          .limit(200)
+        if (fallbackRes.data) {
+          setMessages(fallbackRes.data.map((m) => ({ ...m, profiles: null })) as unknown as MessageWithSender[])
+          setTimeout(() => scrollToBottom('auto'), 50)
+        }
+      }
+    }
+
+    loadMessageHistory()
   }, [])
 
-  // Subscribe to Supabase Realtime for live messages and deletions
+  // 2. Subscribe to Supabase Realtime for live messages and deletions
   useEffect(() => {
     const supabase = createClient()
 
@@ -89,7 +118,8 @@ export default function CommunityChat({
           const newRow = payload.new as {
             id: string
             user_id: string | null
-            content: string
+            content: string | null
+            image_url: string | null
             created_at: string
           }
 
@@ -167,10 +197,40 @@ export default function CommunityChat({
     }
   }, [currentUserId, currentUserProfile])
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Image exceeds 5MB limit. Please choose a smaller photo.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Please select a valid image file (PNG, JPG, WEBP, GIF).')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    setSelectedImage(file)
+    setImagePreviewUrl(URL.createObjectURL(file))
+    setErrorMsg(null)
+  }
+
+  const handleRemoveImage = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl)
+    }
+    setSelectedImage(null)
+    setImagePreviewUrl(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     const content = text.trim()
-    if (!content || isSubmitting) return
+    if ((!content && !selectedImage) || isSubmitting) return
 
     if (content.length > 500) {
       setErrorMsg('Message exceeds 500 characters.')
@@ -182,10 +242,14 @@ export default function CommunityChat({
 
     // Temporary optimistic ID
     const optimisticId = `temp-${Date.now()}`
+    const previewUrl = imagePreviewUrl
+    const fileToUpload = selectedImage
+
     const optimisticMessage: MessageWithSender = {
       id: optimisticId,
       user_id: currentUserId,
-      content,
+      content: content || null,
+      image_url: previewUrl || null,
       created_at: new Date().toISOString(),
       profiles: currentUserProfile
         ? {
@@ -200,13 +264,45 @@ export default function CommunityChat({
 
     setMessages((prev) => [...prev, optimisticMessage])
     setText('')
+    handleRemoveImage()
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
     setTimeout(() => scrollToBottom(), 20)
 
     try {
-      const res = await postMessage(content)
+      let finalImageUrl: string | null = null
+
+      if (fileToUpload) {
+        setIsUploadingImage(true)
+        const supabase = createClient()
+        const ext = fileToUpload.name.split('.').pop()?.toLowerCase() || 'jpg'
+        const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+        const filePath = `${currentUserId}/${cleanName}`
+
+        const { error: uploadErr } = await supabase.storage
+          .from('chat-images')
+          .upload(filePath, fileToUpload, {
+            contentType: fileToUpload.type,
+            upsert: false,
+          })
+
+        if (uploadErr) {
+          throw new Error(`Photo upload failed: ${uploadErr.message}`)
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('chat-images')
+          .getPublicUrl(filePath)
+
+        finalImageUrl = urlData.publicUrl
+      }
+
+      const res = await postMessage({
+        content: content || null,
+        imageUrl: finalImageUrl,
+      })
+
       if (res.success && res.message) {
         // Replace optimistic entry with saved row
         setMessages((prev) =>
@@ -228,6 +324,7 @@ export default function CommunityChat({
       setErrorMsg(err instanceof Error ? err.message : 'Failed to post message.')
     } finally {
       setIsSubmitting(false)
+      setIsUploadingImage(false)
       scrollToBottom()
     }
   }
@@ -370,25 +467,23 @@ export default function CommunityChat({
                 )}
 
                 {/* Message Bubble Container */}
-                <div className={`flex flex-col max-w-[82%] ${isOwn ? 'items-end' : 'items-start'}`}>
-                  {/* Sender Name & Details Header */}
-                  {!isOwn && (
-                    <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <span className="text-xs font-semibold text-[var(--text-ink)]">
-                        {senderName}
+                <div className={`flex flex-col max-w-[82%] sm:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                  {/* Sender Name & Details Header - visible on EVERY message */}
+                  <div className={`flex items-center gap-1.5 mb-1 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    <span className="text-[11px] font-medium text-[var(--text-muted)] font-sans">
+                      {isOwn ? 'You' : senderName}
+                    </span>
+                    {isSenderAdmin && (
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
+                        Pastor / Admin
                       </span>
-                      {isSenderAdmin && (
-                        <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
-                          Pastor / Admin
-                        </span>
-                      )}
-                      {senderUnit && !isSenderAdmin && (
-                        <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[130px]">
-                          / {senderUnit}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {!isOwn && senderUnit && !isSenderAdmin && (
+                      <span className="text-[10px] text-[var(--text-muted)]/80 truncate max-w-[130px]">
+                        · {senderUnit}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Bubble Content */}
                   <div
@@ -398,9 +493,26 @@ export default function CommunityChat({
                         : 'bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-bl-xs'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap leading-relaxed select-text font-normal">
-                      {msg.content}
-                    </p>
+                    {/* Inline Image Attachment */}
+                    {msg.image_url && (
+                      <div className="mb-2 overflow-hidden rounded-xl bg-black/5 dark:bg-black/20">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={msg.image_url}
+                          alt="Attached photo"
+                          loading="lazy"
+                          className="w-full max-h-72 object-cover rounded-xl cursor-pointer hover:opacity-95 transition"
+                          onClick={() => window.open(msg.image_url!, '_blank', 'noopener,noreferrer')}
+                        />
+                      </div>
+                    )}
+
+                    {/* Text content if present */}
+                    {msg.content && (
+                      <p className="whitespace-pre-wrap leading-relaxed select-text font-normal">
+                        {msg.content}
+                      </p>
+                    )}
 
                     {/* Footer inside bubble: timestamp & delete button */}
                     <div
@@ -456,48 +568,98 @@ export default function CommunityChat({
       <div className="fixed bottom-[56px] left-0 right-0 z-40 bg-[var(--bg-canvas)]/95 backdrop-blur-md border-t border-[var(--border-hairline)] transition-colors">
         <form
           onSubmit={handleSend}
-          className="max-w-md mx-auto px-4 py-2.5 flex items-end gap-2"
+          className="max-w-md mx-auto px-4 py-2.5 flex flex-col gap-2"
         >
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={handleTextChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Share a word, prayer, or testimony..."
-              maxLength={500}
-              rows={1}
-              className="w-full resize-none rounded-xl bg-[var(--bg-surface)] border border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-ink)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition-all shadow-xs leading-normal max-h-32"
-            />
-            {text.length > 350 && (
-              <span
-                className={`absolute right-2.5 bottom-1 text-[9px] font-medium ${
-                  charsLeft < 20 ? 'text-red-500' : 'text-[var(--text-muted)]'
-                }`}
+          {/* Image Preview thumbnail if an image is selected */}
+          {imagePreviewUrl && (
+            <div className="flex items-center gap-2 p-1.5 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-hairline)] w-fit max-w-full">
+              <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-black/10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreviewUrl}
+                  alt="Attachment preview"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="text-[11px] leading-tight min-w-0 pr-1">
+                <p className="font-medium text-[var(--text-ink)] truncate max-w-[150px]">
+                  {selectedImage?.name || 'Photo attachment'}
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  {selectedImage ? `${(selectedImage.size / 1024).toFixed(0)} KB` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="p-1 rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+                title="Remove photo"
               >
-                {charsLeft}
-              </span>
-            )}
-          </div>
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
-          <button
-            type="submit"
-            disabled={!text.trim() || isSubmitting || text.length > 500}
-            className={`h-8.5 px-3.5 rounded-xl flex items-center justify-center font-medium text-xs transition shadow-xs shrink-0 cursor-pointer ${
-              !text.trim() || isSubmitting || text.length > 500
-                ? 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-hairline)] cursor-not-allowed'
-                : 'bg-[var(--flame-accent)] hover:opacity-95 text-white active:scale-95'
-            }`}
-          >
-            {isSubmitting ? (
-              <Loader2 size={14} className="animate-spin text-white" />
-            ) : (
-              <span className="flex items-center gap-1.5">
-                <span>Send</span>
-                <Send size={12} strokeWidth={1.75} />
-              </span>
-            )}
-          </button>
+          <div className="flex items-end gap-2">
+            {/* Attachment Button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach photo"
+              disabled={isSubmitting}
+              className="h-8.5 w-8.5 rounded-xl flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--flame-accent)] hover:bg-[var(--bg-surface)] border border-transparent hover:border-[var(--border-hairline)] transition shrink-0 cursor-pointer disabled:opacity-50"
+            >
+              <ImageIcon size={18} strokeWidth={1.75} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={text}
+                onChange={handleTextChange}
+                onKeyDown={handleKeyDown}
+                placeholder={selectedImage ? 'Add a caption (optional)...' : 'Share a word, prayer, or testimony...'}
+                maxLength={500}
+                rows={1}
+                className="w-full resize-none rounded-xl bg-[var(--bg-surface)] border border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-ink)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition-all shadow-xs leading-normal max-h-32"
+              />
+              {text.length > 350 && (
+                <span
+                  className={`absolute right-2.5 bottom-1 text-[9px] font-medium ${
+                    charsLeft < 20 ? 'text-red-500' : 'text-[var(--text-muted)]'
+                  }`}
+                >
+                  {charsLeft}
+                </span>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={(!text.trim() && !selectedImage) || isSubmitting || text.length > 500}
+              className={`h-8.5 px-3.5 rounded-xl flex items-center justify-center font-medium text-xs transition shadow-xs shrink-0 cursor-pointer ${
+                (!text.trim() && !selectedImage) || isSubmitting || text.length > 500
+                  ? 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-hairline)] cursor-not-allowed'
+                  : 'bg-[var(--flame-accent)] hover:opacity-95 text-white active:scale-95'
+              }`}
+            >
+              {isSubmitting ? (
+                <Loader2 size={14} className="animate-spin text-white" />
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <span>Send</span>
+                  <Send size={12} strokeWidth={1.75} />
+                </span>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>

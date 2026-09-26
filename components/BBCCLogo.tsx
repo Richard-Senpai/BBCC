@@ -1,41 +1,33 @@
+import Image from 'next/image'
+
 interface BBCCLogoProps {
-  /** 'sm' = 32px · 'md' = 44px · 'lg' = 64px */
-  size?: 'sm' | 'md' | 'lg'
+  /** 'sm' = 32px · 'md' = 40px · 'lg' = 56px · 'xl' = 80px */
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
 
 const sizeMap = {
-  sm: { outer: 'w-8 h-8',  text: 'text-[8px]',  ring: 'ring-[1.5px]' },
-  md: { outer: 'w-10 h-10', text: 'text-[10px]', ring: 'ring-[2px]' },
-  lg: { outer: 'w-14 h-14', text: 'text-sm',    ring: 'ring-[2.5px]' },
+  sm: { dim: 32, class: 'w-8 h-8' },
+  md: { dim: 40, class: 'w-10 h-10' },
+  lg: { dim: 56, class: 'w-14 h-14' },
+  xl: { dim: 80, class: 'w-20 h-20' },
 }
 
 /**
- * BBCC Logo — clean black disc with warm ochre flame ring and stacked "BB / CC" text.
+ * BBCC Logo — Official golden wax seal with concentric rings and BBCC monogram.
  */
 export default function BBCCLogo({ size = 'md', className = '' }: BBCCLogoProps) {
   const s = sizeMap[size]
   return (
-    <div
-      className={`
-        ${s.outer} rounded-full bg-[#151618]
-        ring-[var(--flame-accent)] ${s.ring}
-        flex items-center justify-center shrink-0
-        shadow-xs
-        ${className}
-      `}
-    >
-      <span
-        className={`
-          ${s.text} font-black text-white leading-none
-          tracking-tight text-center
-        `}
-        style={{ fontFamily: 'inherit' }}
-      >
-        BB
-        <br />
-        CC
-      </span>
+    <div className={`relative ${s.class} shrink-0 select-none ${className}`}>
+      <Image
+        src="/logo.png"
+        alt="BBCC Logo"
+        width={s.dim}
+        height={s.dim}
+        priority={size === 'lg' || size === 'xl'}
+        className="w-full h-full object-contain drop-shadow-xs"
+      />
     </div>
   )
 }
