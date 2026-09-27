@@ -24,14 +24,19 @@ export async function GET(request: Request) {
       } = await supabase.auth.getUser()
 
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile } = (await supabase
           .from('profiles')
-          .select('role')
+          .select('role, status')
           .eq('id', user.id)
-          .single() as { data: Pick<Profile, 'role'> | null; error: unknown }
+          .single()) as { data: Pick<Profile, 'role' | 'status'> | null; error: unknown }
 
-        const destination =
-          profile?.role === 'admin' ? '/admin' : next
+        let destination = next
+        if (profile?.role === 'admin') {
+          destination = '/admin'
+        } else if (profile?.status === 'pending' || profile?.status === 'rejected') {
+          destination = '/pending'
+        }
+
         return NextResponse.redirect(`${origin}${destination}`)
       }
     }

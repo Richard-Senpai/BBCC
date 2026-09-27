@@ -8,6 +8,7 @@ import {
   Users,
   Flame,
   Calendar,
+  UserCheck,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
@@ -17,6 +18,7 @@ import ScheduleSettingsCard from '@/components/admin/ScheduleSettingsCard'
 import CurriculumArchitect from '@/components/admin/CurriculumArchitect'
 import MemberRosterTable, { type MemberRosterItem } from '@/components/admin/MemberRosterTable'
 import AnnouncementManager from '@/components/admin/AnnouncementManager'
+import PendingApprovalsSection from '@/components/admin/PendingApprovalsSection'
 import type {
   Profile,
   ChallengeSettings,
@@ -84,13 +86,16 @@ export default async function AdminPage() {
 
   const completionCounts: DayCompletionCount[] = (countsRes.data as DayCompletionCount[] | null) ?? []
   const currentDay = (currentDayRes.data as number) ?? 0
-  const members: Profile[] = membersRes.data ?? []
+  const allMembers: Profile[] = membersRes.data ?? []
+  const pendingMembers = allMembers.filter((m) => m.status === 'pending')
+  const approvedMembers = allMembers.filter((m) => m.status === 'approved' || !m.status)
+  const rejectedMembers = allMembers.filter((m) => m.status === 'rejected')
   const allCompletions = completionsRes.data ?? []
   const announcements: AnnouncementWithAuthor[] = (announcementsRes.data as unknown as AnnouncementWithAuthor[]) ?? []
 
-  // Calculate Member Roster details
+  // Calculate Member Roster details for active approved members
   const rosterItems: MemberRosterItem[] = await Promise.all(
-    members.map(async (m) => {
+    approvedMembers.map(async (m) => {
       const userComps = allCompletions.filter((c) => c.user_id === m.id)
       const lastComp = userComps.sort(
         (a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
@@ -122,7 +127,7 @@ export default async function AdminPage() {
   // ── Stat calculations ──────────────────────────────────────
   const readyDaysCount = days.filter((d) => (d.activities?.length ?? 0) > 0).length
   const readinessPct = Math.round((readyDaysCount / durationDays) * 100)
-  const totalEnrolled = members.length
+  const totalEnrolled = approvedMembers.length
 
   const avgStreak =
     rosterItems.length > 0
@@ -209,6 +214,16 @@ export default async function AdminPage() {
               <BarChart3 size={13} strokeWidth={1.75} />
               <span>Export Analytics</span>
             </Link>
+            {pendingMembers.length > 0 && (
+              <a
+                href="#pending-approvals"
+                className="text-xs font-semibold text-[var(--flame-accent)] bg-[var(--flame-subtle)] border border-[var(--flame-accent)]/30 hover:bg-[var(--flame-accent)]/15 px-3 py-1.5 rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer animate-pulse"
+                title="Review pending member signups"
+              >
+                <UserCheck size={13} strokeWidth={2} />
+                <span>{pendingMembers.length} Pending Approval{pendingMembers.length > 1 ? 's' : ''}</span>
+              </a>
+            )}
             <a
               href="#announcement-manager"
               className="text-xs font-medium text-white bg-[var(--flame-accent)] hover:opacity-95 px-3 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
@@ -218,6 +233,37 @@ export default async function AdminPage() {
             </a>
           </div>
         </div>
+
+        {/* ── Pending Approvals Alert Banner ─────────────────────── */}
+        {pendingMembers.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl bg-[var(--flame-subtle)] border border-[var(--flame-accent)]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[var(--flame-accent)] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <UserCheck size={20} strokeWidth={2} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold text-[var(--text-ink)]">
+                    {pendingMembers.length} New Membership Application{pendingMembers.length > 1 ? 's' : ''} Awaiting Approval
+                  </p>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--flame-accent)] text-white">
+                    Action Required
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                  Confirm these disciples belong to the BBCC congregation before granting access to dashboard, chat, and challenge milestones.
+                </p>
+              </div>
+            </div>
+            <a
+              href="#pending-approvals"
+              className="text-xs font-semibold text-white bg-[var(--flame-accent)] hover:opacity-95 px-3.5 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5 self-start sm:self-auto shrink-0 cursor-pointer"
+            >
+              <span>Review Applications</span>
+              <span>&darr;</span>
+            </a>
+          </div>
+        )}
 
         {/* ── 4 Stat Summary Cards ────────────────────────────── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -307,6 +353,14 @@ export default async function AdminPage() {
         {/* ── Section: Church Announcements & Broadcasts ────────── */}
         <div className="mt-6">
           <AnnouncementManager initialAnnouncements={announcements} />
+        </div>
+
+        {/* ── Section: Pending Membership Approvals ─────────────── */}
+        <div className="mt-6">
+          <PendingApprovalsSection
+            initialPendingMembers={pendingMembers}
+            initialRejectedMembers={rejectedMembers}
+          />
         </div>
 
         {/* ── Section 2: Curriculum Matrix & Architect ─── */}

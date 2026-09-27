@@ -167,6 +167,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const profile = profileRes.data
   if (!profile) redirect('/login')
 
+  const isAdmin = profile.role === 'admin'
+  if (!isAdmin && (profile.status === 'pending' || profile.status === 'rejected')) {
+    redirect('/pending')
+  }
+
   const settings = settingsRes.data
   const currentDay = (currentDayRes.data as number) ?? 0
   const durationDays = settings?.duration_days ?? 40
@@ -174,7 +179,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const challengeTitle = `${durationDays} Days of ${challengeName}`
   const timezone = settings?.timezone ?? 'Africa/Lagos'
 
-  const isAdmin = profile.role === 'admin'
   let effectiveMemberId = user.id
   let displayProfile = profile
 

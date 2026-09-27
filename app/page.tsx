@@ -16,14 +16,19 @@ export default async function HomePage() {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = (await supabase
     .from('profiles')
-    .select('role')
+    .select('role, status')
     .eq('id', user.id)
-    .single() as { data: Pick<Profile, 'role'> | null; error: unknown }
+    .single()) as { data: Pick<Profile, 'role' | 'status'> | null; error: unknown }
 
   if (profile?.role === 'admin') {
     redirect('/admin')
+  }
+
+  // Pending or rejected members must go to holding page
+  if (profile?.status === 'pending' || profile?.status === 'rejected') {
+    redirect('/pending')
   }
 
   redirect('/dashboard')

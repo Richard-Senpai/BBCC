@@ -105,7 +105,20 @@ export default function SignupPage() {
         .from('profiles')
         .update({ phone, fellowship_unit: fellowship })
         .eq('id', user.id)
-      router.push('/dashboard')
+
+      const { data: profile } = (await supabase
+        .from('profiles')
+        .select('role, status')
+        .eq('id', user.id)
+        .single()) as { data: { role: string; status?: string } | null; error: unknown }
+
+      if (profile?.role === 'admin') {
+        router.push('/admin')
+      } else if (profile?.status === 'pending' || profile?.status === 'rejected') {
+        router.push('/pending')
+      } else {
+        router.push('/dashboard')
+      }
       router.refresh()
     } else {
       setEmailSent(true)
@@ -138,11 +151,17 @@ export default function SignupPage() {
     if (user) {
       const { data: profile } = (await supabase
         .from('profiles')
-        .select('role')
+        .select('role, status')
         .eq('id', user.id)
-        .single()) as { data: { role: string } | null; error: unknown }
+        .single()) as { data: { role: string; status?: string } | null; error: unknown }
 
-      router.push(profile?.role === 'admin' ? '/admin' : '/dashboard')
+      if (profile?.role === 'admin') {
+        router.push('/admin')
+      } else if (profile?.status === 'pending' || profile?.status === 'rejected') {
+        router.push('/pending')
+      } else {
+        router.push('/dashboard')
+      }
       router.refresh()
     }
     setLoading(false)

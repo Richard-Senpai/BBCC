@@ -38,6 +38,11 @@ export default async function ProgressPage() {
   const profile = profileRes.data as Profile | null
   if (!profile) redirect('/login')
 
+  const isAdmin = profile.role === 'admin'
+  if (!isAdmin && (profile.status === 'pending' || profile.status === 'rejected')) {
+    redirect('/pending')
+  }
+
   // Calculate unread announcements
   let unreadCount = 0
   if (profile.last_seen_announcements_at) {

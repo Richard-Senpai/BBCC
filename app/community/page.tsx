@@ -29,6 +29,15 @@ export default async function CommunityPage() {
   ])
 
   const profile = profileRes.data as Profile | null
+  if (!profile) {
+    redirect('/login')
+  }
+
+  const isAdmin = profile.role === 'admin'
+  if (!isAdmin && (profile.status === 'pending' || profile.status === 'rejected')) {
+    redirect('/pending')
+  }
+
   const settings = settingsRes.data
   const durationDays = settings?.duration_days ?? 40
   const challengeName = settings?.challenge_name ?? 'Overcomer'

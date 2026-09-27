@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Flame, Crown, Shield, Award, BookOpen, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
@@ -40,6 +41,15 @@ export default async function LeaderboardPage() {
   const currentDay = (currentDayRes.data as number) ?? 0
   const leaderboard: LeaderboardEntry[] = (leaderboardRes.data as LeaderboardEntry[] | null) ?? []
   const userProfile = userProfileRes.data as Profile | null
+  if (!userProfile) {
+    redirect('/login')
+  }
+
+  const isAdmin = userProfile.role === 'admin'
+  if (!isAdmin && (userProfile.status === 'pending' || userProfile.status === 'rejected')) {
+    redirect('/pending')
+  }
+
   const userStats = (userStatsRes.data as MemberStats[] | null)?.[0] ?? {
     current_streak: 0,
     longest_run: 0,

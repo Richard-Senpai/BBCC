@@ -36,6 +36,11 @@ export default async function ProfilePage() {
   const profile = profileRes.data
   if (!profile) redirect('/login')
 
+  const isAdmin = profile.role === 'admin'
+  if (!isAdmin && (profile.status === 'pending' || profile.status === 'rejected')) {
+    redirect('/pending')
+  }
+
   const settings = settingsRes.data
   const durationDays = settings?.duration_days ?? 40
   const challengeName = settings?.challenge_name ?? 'Overcomer'
