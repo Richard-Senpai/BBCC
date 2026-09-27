@@ -253,3 +253,57 @@ export async function seedChallengeDays() {
 }
 
 export const seed40Days = seedChallengeDays
+
+/**
+ * Approve a pending or rejected church member.
+ * Grants immediate access to dashboard, curriculum, completions, and community.
+ */
+export async function approveMember(memberId: string) {
+  const { supabase } = await assertAdmin()
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ status: 'approved' })
+    .eq('id', memberId)
+
+  if (error) {
+    console.error('Error approving member:', error)
+    throw new Error(`Failed to approve member: ${error.message}`)
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin', 'page')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/admin/analytics')
+  revalidatePath('/dashboard')
+  revalidatePath('/leaderboard')
+  revalidatePath('/community')
+  return { success: true, memberId }
+}
+
+/**
+ * Reject a member registration request.
+ * Sets status = 'rejected' and directs them to the pastoral contact holding notice.
+ */
+export async function rejectMember(memberId: string) {
+  const { supabase } = await assertAdmin()
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ status: 'rejected' })
+    .eq('id', memberId)
+
+  if (error) {
+    console.error('Error rejecting member:', error)
+    throw new Error(`Failed to reject member: ${error.message}`)
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin', 'page')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/admin/analytics')
+  revalidatePath('/dashboard')
+  revalidatePath('/leaderboard')
+  revalidatePath('/community')
+  return { success: true, memberId }
+}

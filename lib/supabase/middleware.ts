@@ -38,40 +38,66 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  const isProtectedMember = pathname.startsWith('/dashboard')
+  const isProtectedMember =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/community') ||
+    pathname.startsWith('/leaderboard')
   const isProtectedAdmin = pathname.startsWith('/admin')
+  const isHoldingRoute = pathname.startsWith('/pending')
   const isAuthRoute =
     pathname.startsWith('/login') || pathname.startsWith('/signup')
 
-  // Unauthenticated user hitting a protected route → redirect to login
-  if (!user && (isProtectedMember || isProtectedAdmin)) {
+  // Unauthenticated user hitting any protected or holding route → redirect to login
+  if (!user && (isProtectedMember || isProtectedAdmin || isHoldingRoute)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Authenticated user hitting an auth route → redirect to their home
-  if (user && isAuthRoute) {
-    const { data: profile } = await supabase
+  // Authenticated user checks
+  if (user) {
+    const { data: profile } = (await supabase
       .from('profiles')
-      .select('role')
+      .select('role, status')
       .eq('id', user.id)
-      .single() as { data: Pick<Profile, 'role'> | null; error: unknown }
+      .single()) as { data: Pick<Profile, 'role' | 'status'> | null; error: unknown }
 
-    const url = request.nextUrl.clone()
-    url.pathname = profile?.role === 'admin' ? '/admin' : '/dashboard'
-    return NextResponse.redirect(url)
-  }
+    const isAdmin = profile?.role === 'admin'
+    // Status is considered pending or rejected if explicitly set as such.
+    // Existing members without status (or status = 'approved') are approved.
+    const isUnapproved =
+      !isAdmin &&
+      (profile?.status === 'pending' || profile?.status === 'rejected')
 
-  // Admin-only area accessed by a non-admin → redirect to dashboard
-  if (user && isProtectedAdmin) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single() as { data: Pick<Profile, 'role'> | null; error: unknown }
+    // 1. Pending or Rejected members:
+    if (isUnapproved) {
+      // Allow them to stay on the holding page
+      if (isHoldingRoute) {
+        return supabaseResponse
+      }
+      // Redirect away from all other routes (dashboard, community, admin, login, etc.) to /pending
+      const url = request.nextUrl.clone()
+      url.pathname = '/pending'
+      return NextResponse.redirect(url)
+    }
 
-    if (profile?.role !== 'admin') {
+    // 2. Approved members & admins:
+    // If they hit /pending holding page, redirect to their home
+    if (isHoldingRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = isAdmin ? '/admin' : '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    // If they hit an auth route (login/signup) → redirect to their home
+    if (isAuthRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = isAdmin ? '/admin' : '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    // Admin-only area accessed by a non-admin → redirect to dashboard
+    if (isProtectedAdmin && !isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

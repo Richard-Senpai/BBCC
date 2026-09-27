@@ -1,4 +1,5 @@
 export type UserRole = 'member' | 'admin'
+export type UserStatus = 'pending' | 'approved' | 'rejected'
 
 export type Profile = {
   id: string
@@ -7,6 +8,7 @@ export type Profile = {
   phone: string
   fellowship_unit: string
   role: UserRole
+  status: UserStatus
   avatar_url?: string | null
   last_seen_announcements_at?: string | null
   created_at: string
@@ -128,6 +130,7 @@ export type Database = {
           phone?: string
           fellowship_unit?: string
           role?: UserRole
+          status?: UserStatus
           avatar_url?: string | null
           last_seen_announcements_at?: string | null
           created_at?: string
@@ -139,6 +142,7 @@ export type Database = {
           phone?: string
           fellowship_unit?: string
           role?: UserRole
+          status?: UserStatus
           avatar_url?: string | null
           last_seen_announcements_at?: string | null
           created_at?: string
