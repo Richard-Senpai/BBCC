@@ -191,9 +191,16 @@ export default async function LeaderboardPage() {
                   <Crown size={12} strokeWidth={1.75} />
                   First Watch Crown
                 </span>
-                <h3 className="font-semibold text-[var(--text-ink)] text-sm truncate">
-                  {top1.full_name}
-                </h3>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-semibold text-[var(--text-ink)] text-sm truncate">
+                    {top1.full_name}
+                  </h3>
+                  {top1.display_tag && (
+                    <span className="text-[10px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                      {top1.display_tag}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-[var(--text-muted)] truncate">
                   {top1.fellowship_unit || 'General Assembly'}
                 </p>
@@ -232,9 +239,16 @@ export default async function LeaderboardPage() {
                     size="md"
                   />
                 </div>
-                <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
-                  {top2.full_name}
-                </h4>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
+                    {top2.full_name}
+                  </h4>
+                  {top2.display_tag && (
+                    <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                      {top2.display_tag}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
                   {top2.fellowship_unit || 'General Assembly'}
                 </p>
@@ -263,9 +277,16 @@ export default async function LeaderboardPage() {
                     size="md"
                   />
                 </div>
-                <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
-                  {top3.full_name}
-                </h4>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
+                    {top3.full_name}
+                  </h4>
+                  {top3.display_tag && (
+                    <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                      {top3.display_tag}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
                   {top3.fellowship_unit || 'General Assembly'}
                 </p>
@@ -296,10 +317,15 @@ export default async function LeaderboardPage() {
                   size="md"
                 />
                 <div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="font-semibold text-sm text-[var(--text-ink)]">
                       {userProfile.full_name}
                     </p>
+                    {userProfile.display_tag && (
+                      <span className="text-[10px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                        {userProfile.display_tag}
+                      </span>
+                    )}
                     <span className="text-[10px] bg-[var(--bg-subtle)] text-[var(--flame-accent)] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
                       You
                     </span>
@@ -479,9 +505,16 @@ export default async function LeaderboardPage() {
                     size="sm"
                   />
                   <div>
-                    <p className="font-semibold text-xs text-[var(--text-ink)]">
-                      {member.full_name}
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-semibold text-xs text-[var(--text-ink)]">
+                        {member.full_name}
+                      </p>
+                      {member.display_tag && (
+                        <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                          {member.display_tag}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-[var(--text-muted)]">
                       {member.fellowship_unit || 'General Assembly'} · <span className="font-semibold text-[var(--olive-accent)]">{member.total_completed}</span> Done
                     </p>

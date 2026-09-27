@@ -9,6 +9,7 @@ export type Profile = {
   fellowship_unit: string
   role: UserRole
   status: UserStatus
+  display_tag?: string | null
   avatar_url?: string | null
   last_seen_announcements_at?: string | null
   created_at: string
@@ -67,6 +68,7 @@ export type LeaderboardEntry = {
   full_name: string
   fellowship_unit: string
   avatar_url?: string | null
+  display_tag?: string | null
   current_streak: number
   total_completed: number
   last_completed_at: string | null
@@ -96,6 +98,7 @@ export type MessageWithSender = Message & {
     avatar_url?: string | null
     fellowship_unit: string
     role: UserRole
+    display_tag?: string | null
   } | null
 }
 
@@ -131,6 +134,7 @@ export type Database = {
           fellowship_unit?: string
           role?: UserRole
           status?: UserStatus
+          display_tag?: string | null
           avatar_url?: string | null
           last_seen_announcements_at?: string | null
           created_at?: string
@@ -143,6 +147,7 @@ export type Database = {
           fellowship_unit?: string
           role?: UserRole
           status?: UserStatus
+          display_tag?: string | null
           avatar_url?: string | null
           last_seen_announcements_at?: string | null
           created_at?: string

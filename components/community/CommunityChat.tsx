@@ -81,7 +81,7 @@ export default function CommunityChat({
       const supabase = createClient()
       const { data, error } = await supabase
         .from('messages')
-        .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role)')
+        .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role, display_tag)')
         .order('created_at', { ascending: true })
         .limit(200)
 
@@ -139,6 +139,7 @@ export default function CommunityChat({
                   avatar_url: currentUserProfile.avatar_url,
                   fellowship_unit: currentUserProfile.fellowship_unit,
                   role: currentUserProfile.role,
+                  display_tag: currentUserProfile.display_tag ?? null,
                 },
               }
               return [...prev, ownMessage]
@@ -148,7 +149,7 @@ export default function CommunityChat({
             if (newRow.user_id) {
               supabase
                 .from('profiles')
-                .select('id, full_name, avatar_url, fellowship_unit, role')
+                .select('id, full_name, avatar_url, fellowship_unit, role, display_tag')
                 .eq('id', newRow.user_id)
                 .single()
                 .then(({ data: profileData }) => {
@@ -258,6 +259,7 @@ export default function CommunityChat({
             avatar_url: currentUserProfile.avatar_url,
             fellowship_unit: currentUserProfile.fellowship_unit,
             role: currentUserProfile.role,
+            display_tag: currentUserProfile.display_tag ?? null,
           }
         : null,
     }
@@ -475,10 +477,15 @@ export default function CommunityChat({
                     </span>
                     {isSenderAdmin && (
                       <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
-                        Pastor / Admin
+                        Admin
                       </span>
                     )}
-                    {!isOwn && senderUnit && !isSenderAdmin && (
+                    {msg.profiles?.display_tag && (
+                      <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                        {msg.profiles.display_tag}
+                      </span>
+                    )}
+                    {!isOwn && senderUnit && (
                       <span className="text-[10px] text-[var(--text-muted)]/80 truncate max-w-[130px]">
                         · {senderUnit}
                       </span>

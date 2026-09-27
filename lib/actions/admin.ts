@@ -181,11 +181,57 @@ export async function saveChallengeDay(params: {
     }
   }
 
+  // Fetch newly saved activities with their assigned IDs and video_url
+  const { data: savedActivities } = await supabase
+    .from('activities')
+    .select('id, challenge_day_id, description, sort_order, video_url')
+    .eq('challenge_day_id', dayId)
+    .order('sort_order', { ascending: true })
+
   revalidatePath('/admin')
   revalidatePath('/dashboard', 'page')
   revalidatePath('/dashboard', 'layout')
   revalidatePath('/dashboard/progress', 'page')
-  return { success: true, dayId }
+
+  return {
+    success: true,
+    dayId,
+    day: {
+      id: dayId,
+      day_number: dayNumber,
+      title: title.trim(),
+      description: description.trim() || null,
+      scripture_reference: scriptureReference.trim(),
+      activities: (savedActivities ?? []).map((a) => ({
+        id: a.id,
+        challenge_day_id: a.challenge_day_id,
+        description: a.description,
+        sort_order: a.sort_order,
+        video_url: a.video_url ?? '',
+      })),
+    },
+  }
+}
+
+/**
+ * Fetch a single challenge day and its activities directly from the database.
+ * Used by CurriculumArchitect when switching days to guarantee fresh data.
+ */
+export async function getChallengeDay(dayNumber: number) {
+  const { supabase } = await assertAdmin()
+
+  const { data: dayRow } = await supabase
+    .from('challenge_days')
+    .select('id, day_number, title, description, scripture_reference, activities(id, challenge_day_id, description, sort_order, video_url)')
+    .eq('day_number', dayNumber)
+    .maybeSingle()
+
+  if (!dayRow) return null
+
+  return {
+    ...dayRow,
+    activities: (dayRow.activities ?? []).sort((a, b) => a.sort_order - b.sort_order),
+  }
 }
 
 /**
@@ -306,4 +352,36 @@ export async function rejectMember(memberId: string) {
   revalidatePath('/leaderboard')
   revalidatePath('/community')
   return { success: true, memberId }
+}
+
+/**
+ * Assign, edit, or clear a member's cosmetic display tag (e.g. "Pastor", "Choir Lead").
+ * This is strictly a cosmetic display label and does NOT grant or alter administrative permissions or RLS.
+ */
+export async function updateMemberDisplayTag(
+  memberId: string,
+  displayTag: string | null
+) {
+  const { supabase } = await assertAdmin()
+
+  const cleanTag = displayTag && displayTag.trim().length > 0 ? displayTag.trim() : null
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_tag: cleanTag })
+    .eq('id', memberId)
+
+  if (error) {
+    console.error('Error updating member display tag:', error)
+    throw new Error(`Failed to update display tag: ${error.message}`)
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin', 'page')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/dashboard', 'page')
+  revalidatePath('/leaderboard', 'page')
+  revalidatePath('/community', 'page')
+
+  return { success: true, memberId, displayTag: cleanTag }
 }

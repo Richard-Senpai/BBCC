@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Users, Search, Flame, Award, Bell, Eye } from 'lucide-react'
+import { Users, Search, Flame, Award, Bell, Eye, Tag, X, Check, Loader2 } from 'lucide-react'
 import UserAvatar from '@/components/UserAvatar'
 import { FELLOWSHIP_UNITS } from '@/lib/types'
+import { updateMemberDisplayTag } from '@/lib/actions/admin'
 
 export interface MemberRosterItem {
   id: string
@@ -12,6 +13,8 @@ export interface MemberRosterItem {
   email: string
   fellowship_unit: string
   avatar_url?: string | null
+  display_tag?: string | null
+  role?: string
   current_streak: number
   longest_run: number
   total_completed: number
@@ -24,17 +27,29 @@ interface MemberRosterTableProps {
 }
 
 export default function MemberRosterTable({
-  members,
+  members: initialMembers,
   durationDays = 40,
 }: MemberRosterTableProps) {
+  const [membersList, setMembersList] = useState<MemberRosterItem[]>(initialMembers)
   const [search, setSearch] = useState('')
   const [selectedUnit, setSelectedUnit] = useState<string>('All')
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
-  const filtered = members.filter((m) => {
+  // Tag modal state
+  const [tagModalMember, setTagModalMember] = useState<MemberRosterItem | null>(null)
+  const [tagInput, setTagInput] = useState('')
+  const [isTagPending, startTagTransition] = useTransition()
+
+  // Sync if initialMembers change
+  if (initialMembers !== membersList && initialMembers.length !== membersList.length) {
+    setMembersList(initialMembers)
+  }
+
+  const filtered = membersList.filter((m) => {
     const matchesSearch =
       m.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      m.email.toLowerCase().includes(search.toLowerCase())
+      m.email.toLowerCase().includes(search.toLowerCase()) ||
+      (m.display_tag && m.display_tag.toLowerCase().includes(search.toLowerCase()))
     const matchesUnit =
       selectedUnit === 'All' || m.fellowship_unit === selectedUnit
     return matchesSearch && matchesUnit
@@ -45,8 +60,44 @@ export default function MemberRosterTable({
     setTimeout(() => setActionNotice(null), 3500)
   }
 
+  function handleOpenTagModal(member: MemberRosterItem) {
+    setTagModalMember(member)
+    setTagInput(member.display_tag ?? '')
+  }
+
+  function handleCloseTagModal() {
+    setTagModalMember(null)
+    setTagInput('')
+  }
+
+  function handleSaveTag(clear: boolean = false) {
+    if (!tagModalMember) return
+    const memberId = tagModalMember.id
+    const targetTag = clear ? null : tagInput.trim() || null
+
+    startTagTransition(async () => {
+      try {
+        await updateMemberDisplayTag(memberId, targetTag)
+        setMembersList((prev) =>
+          prev.map((m) => (m.id === memberId ? { ...m, display_tag: targetTag } : m))
+        )
+        setActionNotice(
+          targetTag
+            ? `Assigned tag "${targetTag}" to ${tagModalMember.full_name}`
+            : `Cleared tag for ${tagModalMember.full_name}`
+        )
+        setTimeout(() => setActionNotice(null), 3500)
+        handleCloseTagModal()
+      } catch (err) {
+        setActionNotice(
+          `Failed to update tag: ${err instanceof Error ? err.message : 'Unknown error'}`
+        )
+      }
+    })
+  }
+
   return (
-    <section className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors">
+    <section className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[var(--border-hairline)] gap-3">
         <div>
@@ -59,7 +110,7 @@ export default function MemberRosterTable({
             </h2>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Tracking daily devotional engagement, prayer fidelity, and pastoral follow-ups.
+            Tracking daily devotional engagement, prayer fidelity, pastoral follow-ups, and cosmetic name tags.
           </p>
         </div>
 
@@ -70,7 +121,7 @@ export default function MemberRosterTable({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search member by name..."
+              placeholder="Search member or tag..."
               className="px-3 py-1.5 pl-8 text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-ink)] border border-[var(--border-hairline)] placeholder:text-[var(--text-muted)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition w-48 sm:w-56 shadow-xs"
             />
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
@@ -127,9 +178,21 @@ export default function MemberRosterTable({
                           size="sm"
                         />
                         <div className="min-w-0">
-                          <p className="font-semibold text-xs text-[var(--text-ink)] truncate">
-                            {member.full_name}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold text-xs text-[var(--text-ink)] truncate">
+                              {member.full_name}
+                            </p>
+                            {member.role === 'admin' && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
+                                Admin
+                              </span>
+                            )}
+                            {member.display_tag && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--olive-accent)]/10 text-[var(--olive-accent)] border border-[var(--olive-accent)]/20">
+                                {member.display_tag}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-[var(--text-muted)] truncate">
                             {member.email}
                           </p>
@@ -181,20 +244,30 @@ export default function MemberRosterTable({
                     {/* Actions */}
                     <td className="py-3 pl-4 text-right">
                       <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTagModal(member)}
+                          className="px-2 py-1 text-[10px] font-medium text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title={`Assign or edit cosmetic tag for ${member.full_name}`}
+                        >
+                          <Tag size={11} strokeWidth={1.75} className="text-[var(--olive-accent)]" />
+                          <span>{member.display_tag ? 'Edit Tag' : 'Tag'}</span>
+                        </button>
+
                         <Link
                           href={`/dashboard?as_member=${member.id}`}
-                          className="px-2.5 py-1 text-[10px] font-medium text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 shadow-2xs"
+                          className="px-2 py-1 text-[10px] font-medium text-[var(--text-ink)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 shadow-2xs"
                           title={`Preview ${member.full_name}'s dashboard`}
                         >
                           <Eye size={11} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
-                          <span>View Member</span>
+                          <span>View</span>
                         </Link>
 
                         {member.current_streak >= 7 ? (
                           <button
                             type="button"
                             onClick={() => handleAction(member.full_name, 'Commend')}
-                            className="px-2.5 py-1 text-[10px] font-medium text-[var(--olive-accent)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 cursor-pointer"
+                            className="px-2 py-1 text-[10px] font-medium text-[var(--olive-accent)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 cursor-pointer"
                           >
                             <span>Commend</span>
                             <Award size={11} strokeWidth={1.75} />
@@ -203,7 +276,7 @@ export default function MemberRosterTable({
                           <button
                             type="button"
                             onClick={() => handleAction(member.full_name, 'Remind')}
-                            className="px-2.5 py-1 text-[10px] font-medium text-[var(--flame-accent)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 cursor-pointer"
+                            className="px-2 py-1 text-[10px] font-medium text-[var(--flame-accent)] bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] rounded-md border border-[var(--border-hairline)] transition flex items-center gap-1 cursor-pointer"
                           >
                             <span>Remind</span>
                             <Bell size={11} strokeWidth={1.75} />
@@ -227,9 +300,127 @@ export default function MemberRosterTable({
 
       <div className="mt-4 pt-3 border-t border-[var(--border-hairline)] flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span>
-          Showing {filtered.length} of {members.length} registered disciples
+          Showing {filtered.length} of {membersList.length} registered disciples
         </span>
       </div>
+
+      {/* ── Assign / Edit Tag Modal ──────────────────────────────── */}
+      {tagModalMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-2xl w-full max-w-sm p-5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
+              <div className="flex items-center gap-2">
+                <Tag size={16} className="text-[var(--flame-accent)]" />
+                <h3 className="text-sm font-semibold text-[var(--text-ink)]">
+                  Assign Display Tag
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseTagModal}
+                disabled={isTagPending}
+                className="text-[var(--text-muted)] hover:text-[var(--text-ink)] p-1 rounded-md"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Setting cosmetic title/tag for{' '}
+                  <strong className="text-[var(--text-ink)]">{tagModalMember.full_name}</strong>.
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                  Appears next to their name in Chat, Leaderboard, and Roster. Does NOT grant admin permissions.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-ink)] mb-1">
+                  Tag Name (e.g. Pastor, Choir Lead, Youth Pastor, Deacon)
+                </label>
+                <input
+                  type="text"
+                  maxLength={30}
+                  placeholder="e.g. Pastor, Choir Lead, Elder..."
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSaveTag(false)
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)]"
+                  autoFocus
+                />
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Quick suggestions:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Pastor', 'Elder', 'Deacon', 'Choir Lead', 'Prayer Leader', 'Media Team'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setTagInput(preset)}
+                      className="px-2 py-0.5 text-[10px] rounded bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-ink)] hover:border-[var(--flame-accent)] border border-[var(--border-hairline)] transition"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--border-hairline)] flex items-center justify-between gap-2">
+              {tagModalMember.display_tag ? (
+                <button
+                  type="button"
+                  onClick={() => handleSaveTag(true)}
+                  disabled={isTagPending}
+                  className="px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition font-medium"
+                >
+                  Clear Tag
+                </button>
+              ) : (
+                <span />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseTagModal}
+                  disabled={isTagPending}
+                  className="px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-ink)] rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveTag(false)}
+                  disabled={isTagPending}
+                  className="px-3.5 py-1.5 text-xs font-semibold text-white bg-[var(--flame-accent)] hover:opacity-90 disabled:opacity-50 rounded-lg transition flex items-center gap-1.5 shadow-xs"
+                >
+                  {isTagPending ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={12} strokeWidth={2.5} />
+                      <span>Save Tag</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

@@ -23,7 +23,7 @@ export default async function CommunityPage() {
     supabase.rpc('get_current_challenge_day'),
     supabase
       .from('messages')
-      .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role)')
+      .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role, display_tag)')
       .order('created_at', { ascending: true })
       .limit(150),
   ])

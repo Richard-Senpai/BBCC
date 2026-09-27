@@ -59,14 +59,13 @@ export default async function AdminPage() {
     supabase.from('challenge_settings').select('*').eq('id', 1).single(),
     supabase
       .from('challenge_days')
-      .select('*, activities(id, challenge_day_id, description, sort_order)')
+      .select('*, activities(id, challenge_day_id, description, sort_order, video_url)')
       .order('day_number', { ascending: true }),
     supabase.rpc('get_day_completion_counts'),
     supabase.rpc('get_current_challenge_day'),
     supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'member')
       .order('created_at', { ascending: false }),
     supabase
       .from('completions')
@@ -87,9 +86,9 @@ export default async function AdminPage() {
   const completionCounts: DayCompletionCount[] = (countsRes.data as DayCompletionCount[] | null) ?? []
   const currentDay = (currentDayRes.data as number) ?? 0
   const allMembers: Profile[] = membersRes.data ?? []
-  const pendingMembers = allMembers.filter((m) => m.status === 'pending')
-  const approvedMembers = allMembers.filter((m) => m.status === 'approved' || !m.status)
-  const rejectedMembers = allMembers.filter((m) => m.status === 'rejected')
+  const pendingMembers = allMembers.filter((m) => m.role !== 'admin' && m.status === 'pending')
+  const approvedMembers = allMembers.filter((m) => m.role === 'admin' || m.status === 'approved' || !m.status)
+  const rejectedMembers = allMembers.filter((m) => m.role !== 'admin' && m.status === 'rejected')
   const allCompletions = completionsRes.data ?? []
   const announcements: AnnouncementWithAuthor[] = (announcementsRes.data as unknown as AnnouncementWithAuthor[]) ?? []
 
@@ -113,6 +112,8 @@ export default async function AdminPage() {
         email: m.email,
         fellowship_unit: m.fellowship_unit || 'General Assembly',
         avatar_url: m.avatar_url ?? null,
+        display_tag: m.display_tag ?? null,
+        role: m.role,
         current_streak: stats.current_streak,
         longest_run: stats.longest_run,
         total_completed: userComps.length,
