@@ -118,6 +118,19 @@ export type AnnouncementWithAuthor = Announcement & {
   } | null
 }
 
+export type JournalEntry = {
+  id: string
+  user_id: string
+  challenge_day_id: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export type JournalEntryWithDay = JournalEntry & {
+  challenge_days?: Pick<ChallengeDay, 'id' | 'day_number' | 'title' | 'scripture_reference'> | null
+}
+
 // ─────────────────────────────────────────
 // Supabase Database type map
 // ─────────────────────────────────────────
@@ -330,6 +343,41 @@ export type Database = {
           {
             foreignKeyName: 'announcements_created_by_fkey'
             columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      journal_entries: {
+        Row: JournalEntry
+        Insert: {
+          id?: string
+          user_id: string
+          challenge_day_id: string
+          content: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          challenge_day_id?: string
+          content?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'journal_entries_challenge_day_id_fkey'
+            columns: ['challenge_day_id']
+            isOneToOne: false
+            referencedRelation: 'challenge_days'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'journal_entries_user_id_fkey'
+            columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']
