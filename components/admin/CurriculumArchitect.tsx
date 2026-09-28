@@ -179,6 +179,15 @@ export default function CurriculumArchitect({
           activities: snapshot.activities,
         })
 
+        if (!result.success) {
+          setSaveStatus('error')
+          setFeedback({
+            type: 'error',
+            text: result.error || `Failed to save Day ${dayNum}`,
+          })
+          return false
+        }
+
         if (result && result.day) {
           const savedDay: DayData = {
             id: result.day.id,

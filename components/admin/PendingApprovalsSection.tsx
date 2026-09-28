@@ -43,7 +43,11 @@ export default function PendingApprovalsSection({
   async function handleApprove(member: Profile) {
     setLoadingId(member.id)
     try {
-      await approveMember(member.id)
+      const res = await approveMember(member.id)
+      if (!res.success) {
+        showNotice(res.error || 'Failed to approve member.', 'error')
+        return
+      }
       // Move from pending/rejected to approved
       setPendingList((prev) => prev.filter((m) => m.id !== member.id))
       setRejectedList((prev) => prev.filter((m) => m.id !== member.id))
@@ -61,7 +65,11 @@ export default function PendingApprovalsSection({
   async function handleConfirmReject(member: Profile) {
     setLoadingId(member.id)
     try {
-      await rejectMember(member.id)
+      const res = await rejectMember(member.id)
+      if (!res.success) {
+        showNotice(res.error || 'Failed to reject member.', 'error')
+        return
+      }
       // Move from pending to rejected
       setPendingList((prev) => prev.filter((m) => m.id !== member.id))
       setRejectedList((prev) => [

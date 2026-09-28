@@ -31,7 +31,11 @@ export default function AnnouncementManager({
 
     try {
       const res = await createAnnouncement(title, body)
-      if (res.success && res.announcement) {
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to publish announcement.')
+        return
+      }
+      if (res.announcement) {
         setAnnouncements((prev) => [res.announcement as AnnouncementWithAuthor, ...prev])
         setTitle('')
         setBody('')
@@ -55,7 +59,11 @@ export default function AnnouncementManager({
     setSuccessMsg(null)
 
     try {
-      await deleteAnnouncement(id)
+      const res = await deleteAnnouncement(id)
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to delete announcement.')
+        return
+      }
       setAnnouncements((prev) => prev.filter((a) => a.id !== id))
       setSuccessMsg('Announcement deleted.')
       setTimeout(() => setSuccessMsg(null), 3000)

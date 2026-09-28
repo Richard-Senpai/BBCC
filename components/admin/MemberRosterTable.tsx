@@ -77,7 +77,11 @@ export default function MemberRosterTable({
 
     startTagTransition(async () => {
       try {
-        await updateMemberDisplayTag(memberId, targetTag)
+        const res = await updateMemberDisplayTag(memberId, targetTag)
+        if (!res.success) {
+          setActionNotice(`Failed to update tag: ${res.error || 'Unknown error'}`)
+          return
+        }
         setMembersList((prev) =>
           prev.map((m) => (m.id === memberId ? { ...m, display_tag: targetTag } : m))
         )

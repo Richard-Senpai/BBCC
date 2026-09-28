@@ -305,7 +305,11 @@ export default function CommunityChat({
         imageUrl: finalImageUrl,
       })
 
-      if (res.success && res.message) {
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to post message.')
+      }
+
+      if (res.message) {
         // Replace optimistic entry with saved row
         setMessages((prev) =>
           prev.map((m) =>
@@ -342,7 +346,10 @@ export default function CommunityChat({
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
 
     try {
-      await deleteMessage(messageId)
+      const res = await deleteMessage(messageId)
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to delete message.')
+      }
     } catch (err: unknown) {
       console.error('Failed to delete message:', err)
       setMessages(previousMessages)

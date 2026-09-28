@@ -20,7 +20,7 @@ export default async function LeaderboardPage() {
     await Promise.all([
       supabase.rpc('get_current_challenge_day'),
       supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-      supabase.rpc('get_leaderboard', { limit_count: 10 }),
+      supabase.rpc('get_leaderboard', { limit_count: 50 }),
       user
         ? supabase.from('profiles').select('*').eq('id', user.id).single()
         : Promise.resolve({ data: null }),
@@ -61,7 +61,7 @@ export default async function LeaderboardPage() {
   const userRankEntry = userProfile
     ? leaderboard.find((entry) => entry.id === userProfile.id)
     : null
-  const userRank = userRankEntry?.rank ?? (userActivitiesCount > 0 ? 4 : null)
+  const userRank = userRankEntry?.rank ?? (userActivitiesCount > 0 ? (leaderboard.length > 0 ? `>${leaderboard.length}` : '-') : '-')
 
   const top1 = leaderboard[0] ?? null
   const top2 = leaderboard[1] ?? null
@@ -172,7 +172,11 @@ export default async function LeaderboardPage() {
 
         {/* Rank #1 Crown Card */}
         {top1 ? (
-          <div className="bg-[var(--bg-surface)] rounded-xl p-4 border border-[var(--flame-accent)]/40 relative overflow-hidden">
+          <div className={`bg-[var(--bg-surface)] rounded-xl p-4 border relative overflow-hidden transition-all ${
+            top1.id === userProfile.id
+              ? 'border-[var(--flame-accent)] ring-2 ring-[var(--flame-accent)]/30'
+              : 'border-[var(--flame-accent)]/40'
+          }`}>
             <div className="flex items-center gap-3">
               <div className="relative">
                 <UserAvatar
@@ -187,10 +191,17 @@ export default async function LeaderboardPage() {
               </div>
 
               <div className="flex-1 min-w-0">
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--flame-accent)] mb-0.5">
-                  <Crown size={12} strokeWidth={1.75} />
-                  First Watch Crown
-                </span>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--flame-accent)]">
+                    <Crown size={12} strokeWidth={1.75} />
+                    First Watch Crown
+                  </span>
+                  {top1.id === userProfile.id && (
+                    <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.2 rounded shadow-2xs">
+                      You
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h3 className="font-semibold text-[var(--text-ink)] text-sm truncate">
                     {top1.full_name}
@@ -218,26 +229,44 @@ export default async function LeaderboardPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-[var(--bg-surface)] rounded-xl p-6 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-hairline)]">
-            <p className="text-xs">No disciples ranked yet. Begin your streak today.</p>
+          <div className="bg-[var(--bg-surface)] rounded-xl p-8 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)]">
+            <p className="text-sm font-semibold text-[var(--text-ink)] mb-1">
+              No disciples ranked yet
+            </p>
+            <p className="text-xs">
+              Complete your daily consecration disciplines to claim the First Watch Crown!
+            </p>
           </div>
         )}
 
-        {/* Rank #2 and #3 Side-by-Side */}
-        {(top2 || top3) && (
+        {/* Rank #2 and #3 Side-by-Side (Renders gracefully even with partial data) */}
+        {top1 && (
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {/* Rank 2 */}
             {top2 ? (
-              <div className="bg-[var(--bg-surface)] rounded-xl p-3 border border-[var(--border-hairline)] relative">
-                <span className="absolute top-2.5 right-2.5 text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
-                  #2
-                </span>
-                <div className="mb-2">
-                  <UserAvatar
-                    avatarUrl={top2.avatar_url}
-                    name={top2.full_name}
-                    size="md"
-                  />
+              <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
+                top2.id === userProfile.id
+                  ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
+                  : 'border-[var(--border-hairline)]'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="relative">
+                    <UserAvatar
+                      avatarUrl={top2.avatar_url}
+                      name={top2.full_name}
+                      size="md"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {top2.id === userProfile.id && (
+                      <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                        You
+                      </span>
+                    )}
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
+                      #2
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
@@ -262,20 +291,49 @@ export default async function LeaderboardPage() {
                   </span>
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="bg-[var(--bg-surface)]/70 rounded-xl p-3 border border-dashed border-[var(--border-subtle)] flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)] inline-block mb-2">
+                    #2
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-[var(--bg-subtle)] border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] mb-1.5 text-xs font-semibold">
+                    2
+                  </div>
+                  <p className="font-medium text-[var(--text-ink)] text-xs">Open Position</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Complete disciplines to rank</p>
+                </div>
+                <div className="mt-2 pt-2 border-t border-[var(--border-hairline)] text-[10px] text-[var(--text-muted)] font-medium">
+                  Podium Rank #2
+                </div>
+              </div>
+            )}
 
             {/* Rank 3 */}
             {top3 ? (
-              <div className="bg-[var(--bg-surface)] rounded-xl p-3 border border-[var(--border-hairline)] relative">
-                <span className="absolute top-2.5 right-2.5 text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
-                  #3
-                </span>
-                <div className="mb-2">
-                  <UserAvatar
-                    avatarUrl={top3.avatar_url}
-                    name={top3.full_name}
-                    size="md"
-                  />
+              <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
+                top3.id === userProfile.id
+                  ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
+                  : 'border-[var(--border-hairline)]'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="relative">
+                    <UserAvatar
+                      avatarUrl={top3.avatar_url}
+                      name={top3.full_name}
+                      size="md"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {top3.id === userProfile.id && (
+                      <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                        You
+                      </span>
+                    )}
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
+                      #3
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
@@ -300,7 +358,23 @@ export default async function LeaderboardPage() {
                   </span>
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="bg-[var(--bg-surface)]/70 rounded-xl p-3 border border-dashed border-[var(--border-subtle)] flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)] inline-block mb-2">
+                    #3
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-[var(--bg-subtle)] border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] mb-1.5 text-xs font-semibold">
+                    3
+                  </div>
+                  <p className="font-medium text-[var(--text-ink)] text-xs">Open Position</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Complete disciplines to rank</p>
+                </div>
+                <div className="mt-2 pt-2 border-t border-[var(--border-hairline)] text-[10px] text-[var(--text-muted)] font-medium">
+                  Podium Rank #3
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -480,58 +554,93 @@ export default async function LeaderboardPage() {
       </section>
 
       {/* ── Fellowship Roll of Honor ──────────────────────────── */}
-      {runnersUp.length > 0 && (
+      {runnersUp.length > 0 ? (
         <section className="mt-5">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider">
               Fellowship Roll of Honor
             </h3>
-            <span className="text-xs text-[var(--text-muted)]">Ranks #4 – #10</span>
+            <span className="text-xs text-[var(--text-muted)]">
+              Ranks #4 – #{leaderboard.length}
+            </span>
           </div>
 
           <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-hairline)] divide-y divide-[var(--border-hairline)] overflow-hidden">
-            {runnersUp.map((member) => (
-              <div
-                key={member.id}
-                className="p-3 flex items-center justify-between hover:bg-[var(--bg-subtle)] transition"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-5 text-center text-xs font-semibold text-[var(--text-muted)]">
-                    {member.rank}
-                  </span>
-                  <UserAvatar
-                    avatarUrl={member.avatar_url}
-                    name={member.full_name}
-                    size="sm"
-                  />
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="font-semibold text-xs text-[var(--text-ink)]">
-                        {member.full_name}
+            {runnersUp.map((member) => {
+              const isCurrentUser = member.id === userProfile.id
+              return (
+                <div
+                  key={member.id}
+                  className={`p-3 flex items-center justify-between transition ${
+                    isCurrentUser
+                      ? 'bg-[var(--flame-subtle)] border-l-4 border-l-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/20'
+                      : 'hover:bg-[var(--bg-subtle)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`w-5 text-center text-xs font-bold ${
+                      isCurrentUser ? 'text-[var(--flame-accent)]' : 'text-[var(--text-muted)]'
+                    }`}>
+                      #{member.rank}
+                    </span>
+                    <UserAvatar
+                      avatarUrl={member.avatar_url}
+                      name={member.full_name}
+                      size="sm"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className={`font-semibold text-xs ${
+                          isCurrentUser ? 'text-[var(--flame-accent)]' : 'text-[var(--text-ink)]'
+                        }`}>
+                          {member.full_name}
+                        </p>
+                        {isCurrentUser && (
+                          <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.2 rounded shadow-2xs">
+                            You
+                          </span>
+                        )}
+                        {member.display_tag && (
+                          <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                            {member.display_tag}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        {member.fellowship_unit || 'General Assembly'} · <span className="font-semibold text-[var(--olive-accent)]">{member.total_completed}</span> Done
                       </p>
-                      {member.display_tag && (
-                        <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
-                          {member.display_tag}
-                        </span>
-                      )}
                     </div>
-                    <p className="text-[10px] text-[var(--text-muted)]">
-                      {member.fellowship_unit || 'General Assembly'} · <span className="font-semibold text-[var(--olive-accent)]">{member.total_completed}</span> Done
-                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-2 py-0.5 rounded-md border border-[var(--border-hairline)]">
+                      <Flame size={12} strokeWidth={1.75} />
+                      {member.current_streak}d
+                    </span>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-2 py-0.5 rounded-md border border-[var(--border-hairline)]">
-                    <Flame size={12} strokeWidth={1.75} />
-                    {member.current_streak}d
-                  </span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
-      )}
+      ) : leaderboard.length > 0 && leaderboard.length <= 3 ? (
+        <section className="mt-5">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider">
+              Fellowship Roll of Honor
+            </h3>
+            <span className="text-xs text-[var(--text-muted)]">Ranks #4 and beyond</span>
+          </div>
+          <div className="bg-[var(--bg-surface)] rounded-xl p-5 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-hairline)]">
+            <p className="text-xs font-medium text-[var(--text-ink)] mb-0.5">
+              Roll of Honor Open
+            </p>
+            <p className="text-[11px]">
+              Additional approved disciples will appear here as they complete consecration disciplines.
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {/* ── Scripture Exhortation ─────────────────────────────── */}
       <section className="mt-5 mb-3">

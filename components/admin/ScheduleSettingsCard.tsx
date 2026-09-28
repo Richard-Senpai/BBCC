@@ -59,12 +59,16 @@ export default function ScheduleSettingsCard({
 
     startTransition(async () => {
       try {
-        await updateChallengeSettings(
+        const res = await updateChallengeSettings(
           startDate || null,
           timezone,
           durationDays,
           challengeName.trim() || 'Overcomer'
         )
+        if (!res.success) {
+          setMsg({ type: 'error', text: res.error || 'Update failed' })
+          return
+        }
         setMsg({ type: 'success', text: 'Schedule & challenge settings updated successfully!' })
       } catch (err) {
         setMsg({ type: 'error', text: err instanceof Error ? err.message : 'Update failed' })
@@ -84,6 +88,10 @@ export default function ScheduleSettingsCard({
     startSeedTransition(async () => {
       try {
         const res = await seedChallengeDays()
+        if (!res.success) {
+          setMsg({ type: 'error', text: res.error || 'Initialization failed' })
+          return
+        }
         setMsg({ type: 'success', text: `All ${res.count ?? durationDays} days successfully initialized!` })
       } catch (err) {
         setMsg({ type: 'error', text: err instanceof Error ? err.message : 'Initialization failed' })

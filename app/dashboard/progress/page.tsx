@@ -5,6 +5,7 @@ import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
 import AnnouncementBell from '@/components/AnnouncementBell'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
+import MyJournalSection from '@/components/dashboard/MyJournalSection'
 import type { MemberStats, Profile } from '@/lib/types'
 
 export default async function ProgressPage() {
@@ -207,6 +208,11 @@ export default async function ProgressPage() {
           durationDays={durationDays}
           challengeName={challengeName}
         />
+      </section>
+
+      {/* My Spiritual Journal Section */}
+      <section className="px-4">
+        <MyJournalSection />
       </section>
 
       {/* Certificate preview */}

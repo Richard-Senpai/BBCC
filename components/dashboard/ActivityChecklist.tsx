@@ -3,7 +3,8 @@
 import { useOptimistic, useTransition } from 'react'
 import { toggleActivityCompletion } from '@/lib/actions/completions'
 import type { Activity } from '@/lib/types'
-import { Check, CheckCircle2, Circle, Play } from 'lucide-react'
+import { Check, CheckCircle2, Play } from 'lucide-react'
+import JournalNoteBox from '@/components/dashboard/JournalNoteBox'
 
 interface ActivityChecklistProps {
   dayId: string
@@ -12,6 +13,9 @@ interface ActivityChecklistProps {
   initialCompletedIds: string[]
   isDayComplete: boolean
   isToday: boolean
+  currentDay?: number
+  initialJournalContent?: string
+  isPastoralPreview?: boolean
 }
 
 export default function ActivityChecklist({
@@ -20,6 +24,9 @@ export default function ActivityChecklist({
   activities,
   initialCompletedIds,
   isToday,
+  currentDay = 1,
+  initialJournalContent = '',
+  isPastoralPreview = false,
 }: ActivityChecklistProps) {
   const [optimisticDone, toggleOptimistic] = useOptimistic(
     new Set(initialCompletedIds),
@@ -34,10 +41,13 @@ export default function ActivityChecklist({
   const [, startTransition] = useTransition()
 
   function handleToggle(activityId: string) {
-    if (!isToday) return
+    if (!isToday || isPastoralPreview) return
     startTransition(async () => {
       toggleOptimistic(activityId)
-      await toggleActivityCompletion(activityId, dayId)
+      const res = await toggleActivityCompletion(activityId, dayId)
+      if (!res.success) {
+        console.error('Failed to toggle activity completion:', res.error)
+      }
     })
   }
 
@@ -79,10 +89,10 @@ export default function ActivityChecklist({
               <button
                 type="button"
                 onClick={() => handleToggle(activity.id)}
-                disabled={!isToday}
+                disabled={!isToday || isPastoralPreview}
                 className={`
                   flex items-start gap-3 min-w-0 flex-1 text-left
-                  ${!isToday ? 'opacity-75 cursor-default' : 'cursor-pointer active:scale-[0.99]'}
+                  ${!isToday || isPastoralPreview ? 'opacity-75 cursor-default' : 'cursor-pointer active:scale-[0.99]'}
                 `}
               >
                 {/* Checkbox indicator with deliberate motion spring */}
@@ -126,7 +136,7 @@ export default function ActivityChecklist({
                 </div>
               </button>
 
-              {/* Separate Video Link Tap Target */}
+              {/* Video Link Tap Target */}
               {activity.video_url && (
                 <div className="shrink-0 pl-1 border-l border-[var(--border-subtle)] flex items-center">
                   <a
@@ -134,7 +144,6 @@ export default function ActivityChecklist({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {
-                      // Prevent event bubbling to any ancestor
                       e.stopPropagation()
                     }}
                     title="Watch attached video guidance"
@@ -159,18 +168,14 @@ export default function ActivityChecklist({
         })}
       </div>
 
-      {/* Spiritual Reflections textarea */}
-      <div className="mt-4">
-        <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
-          Spiritual Reflections &amp; Journal Note
-        </label>
-        <textarea
-          placeholder="Record today&apos;s revelations, scripture insights, or prayers during devotion…"
-          rows={3}
-          disabled={!isToday}
-          className="bbcc-input resize-none disabled:opacity-60"
-        />
-      </div>
+      {/* Spiritual Reflections & Journal Note Box */}
+      <JournalNoteBox
+        dayId={dayId}
+        dayNumber={dayNumber}
+        currentDay={currentDay}
+        initialContent={initialJournalContent}
+        isPastoralPreview={isPastoralPreview}
+      />
 
       {/* Status Banner */}
       {isToday && total > 0 && allDone && (
@@ -182,4 +187,3 @@ export default function ActivityChecklist({
     </div>
   )
 }
-

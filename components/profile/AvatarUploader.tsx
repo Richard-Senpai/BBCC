@@ -110,7 +110,10 @@ export default function AvatarUploader({
       const finalUrl = publicUrlData.publicUrl
 
       // Persist in profile database row
-      await updateAvatarUrl(finalUrl)
+      const res = await updateAvatarUrl(finalUrl)
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to update profile picture.')
+      }
 
       setAvatarUrl(finalUrl)
       setPreviewUrl(null)

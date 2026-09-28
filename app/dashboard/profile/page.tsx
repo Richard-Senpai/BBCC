@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import AvatarUploader from '@/components/profile/AvatarUploader'
 import AnnouncementsSection from '@/components/profile/AnnouncementsSection'
+import MyJournalSection from '@/components/dashboard/MyJournalSection'
 import type { Profile, MemberStats, AnnouncementWithAuthor } from '@/lib/types'
 
 export default async function ProfilePage() {
@@ -170,6 +171,11 @@ export default async function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* My Spiritual Reflections Section */}
+      <section className="px-4">
+        <MyJournalSection />
+      </section>
 
       {/* Announcements */}
       <AnnouncementsSection

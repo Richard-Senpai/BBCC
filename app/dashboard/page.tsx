@@ -269,6 +269,24 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
+  // Fetch active day's journal note for user if day exists (strictly private)
+  let initialJournalNote = ''
+  if (dayRow?.id && (!isAdmin || effectiveMemberId === user.id)) {
+    try {
+      const { data: journalData } = await supabase
+        .from('journal_entries')
+        .select('content')
+        .eq('user_id', user.id)
+        .eq('challenge_day_id', dayRow.id)
+        .maybeSingle()
+      if (journalData?.content) {
+        initialJournalNote = journalData.content
+      }
+    } catch {
+      // Safe fallback if table is not yet populated
+    }
+  }
+
   const todayChallenge: ChallengeDayWithActivities | null = dayRow
     ? {
         ...dayRow,
@@ -445,6 +463,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 initialCompletedIds={completedActivityIds}
                 isDayComplete={isDayComplete}
                 isToday={isToday}
+                currentDay={currentDay}
+                initialJournalContent={initialJournalNote}
+                isPastoralPreview={isAdmin && effectiveMemberId !== user.id}
               />
             ) : (
               <p className="text-sm text-[var(--text-muted)] text-center py-4">
