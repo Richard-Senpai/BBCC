@@ -64,14 +64,24 @@ export type MemberStats = {
 
 export type LeaderboardEntry = {
   rank: number
-  id: string
+  user_id: string
+  id?: string
   full_name: string
-  fellowship_unit: string
+  fellowship_unit?: string | null
   avatar_url?: string | null
   display_tag?: string | null
   current_streak: number
-  total_completed: number
-  last_completed_at: string | null
+  total_activities_completed: number
+  total_completed?: number
+  last_completed_at?: string | null
+}
+
+export type LeaderboardPayload = {
+  members: LeaderboardEntry[]
+  top_members?: LeaderboardEntry[]
+  total_ranked_members: number
+  my_rank: number | null
+  my_total_activities: number
 }
 
 export type DayCompletionCount = {
@@ -396,7 +406,7 @@ export type Database = {
       }
       get_leaderboard: {
         Args: { limit_count?: number }
-        Returns: LeaderboardEntry[]
+        Returns: LeaderboardPayload | LeaderboardEntry[]
       }
       get_day_completion_counts: {
         Args: Record<string, never>
