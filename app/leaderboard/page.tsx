@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Flame, Crown, Shield, Award, BookOpen, Lock } from 'lucide-react'
+import { Flame, Crown, Shield, Award, BookOpen, Lock, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import UserAvatar from '@/components/UserAvatar'
@@ -15,12 +15,12 @@ export default async function LeaderboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Parallel fetches: current day, settings, top leaderboard (up to 10), and current user metrics
+  // Parallel fetches: current day, settings, leaderboard (top 6 + user rank), and current user profile/stats
   const [currentDayRes, settingsRes, leaderboardRes, userProfileRes, userStatsRes, userActivitiesRes] =
     await Promise.all([
       supabase.rpc('get_current_challenge_day'),
       supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-      supabase.rpc('get_leaderboard', { limit_count: 50 }),
+      supabase.rpc('get_leaderboard'),
       user
         ? supabase.from('profiles').select('*').eq('id', user.id).single()
         : Promise.resolve({ data: null }),
@@ -39,7 +39,50 @@ export default async function LeaderboardPage() {
   const durationDays = settings?.duration_days ?? 40
   const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
-  const leaderboard: LeaderboardEntry[] = (leaderboardRes.data as LeaderboardEntry[] | null) ?? []
+
+  const leaderboardRaw = leaderboardRes.data as any
+  const leaderboardError = leaderboardRes.error ? leaderboardRes.error.message : null
+
+  let members: LeaderboardEntry[] = []
+  let totalRankedMembers = 0
+  let myRank: number | null = null
+  let myTotalActivities = 0
+
+  if (leaderboardRaw) {
+    if (Array.isArray(leaderboardRaw)) {
+      members = leaderboardRaw.map((entry: any) => {
+        const userId = entry.user_id || entry.id || ''
+        const totalActs = entry.total_activities_completed ?? entry.total_completed ?? 0
+        return {
+          ...entry,
+          user_id: userId,
+          id: userId,
+          total_activities_completed: totalActs,
+          total_completed: totalActs,
+        }
+      })
+      totalRankedMembers = leaderboardRaw[0]?.total_ranked_members ?? members.length
+      myRank = leaderboardRaw[0]?.my_rank != null ? Number(leaderboardRaw[0]?.my_rank) : null
+      myTotalActivities = Number(leaderboardRaw[0]?.my_total_activities ?? 0)
+    } else if (typeof leaderboardRaw === 'object') {
+      const rawList = leaderboardRaw.members || leaderboardRaw.top_members || []
+      members = (rawList as any[]).map((entry: any) => {
+        const userId = entry.user_id || entry.id || ''
+        const totalActs = entry.total_activities_completed ?? entry.total_completed ?? 0
+        return {
+          ...entry,
+          user_id: userId,
+          id: userId,
+          total_activities_completed: totalActs,
+          total_completed: totalActs,
+        }
+      })
+      totalRankedMembers = Number(leaderboardRaw.total_ranked_members ?? members.length)
+      myRank = leaderboardRaw.my_rank != null ? Number(leaderboardRaw.my_rank) : null
+      myTotalActivities = Number(leaderboardRaw.my_total_activities ?? 0)
+    }
+  }
+
   const userProfile = userProfileRes.data as Profile | null
   if (!userProfile) {
     redirect('/login')
@@ -57,16 +100,16 @@ export default async function LeaderboardPage() {
   }
   const userActivitiesCount = userActivitiesRes.count ?? 0
 
-  // Find user's rank in leaderboard or calculate
-  const userRankEntry = userProfile
-    ? leaderboard.find((entry) => entry.id === userProfile.id)
-    : null
-  const userRank = userRankEntry?.rank ?? (userActivitiesCount > 0 ? (leaderboard.length > 0 ? `>${leaderboard.length}` : '-') : '-')
+  // Strictly at most top 6 members
+  const topMembers = members.slice(0, 6)
+  const isInsideTop6 = userProfile ? topMembers.some((m) => m.user_id === userProfile.id) : false
+  const effectiveUserRank = myRank ?? (userProfile ? topMembers.find((m) => m.user_id === userProfile.id)?.rank ?? null : null)
+  const userRankDisplay = effectiveUserRank ? `${effectiveUserRank}` : (userActivitiesCount > 0 ? (totalRankedMembers > 0 ? `>${totalRankedMembers}` : '-') : '-')
 
-  const top1 = leaderboard[0] ?? null
-  const top2 = leaderboard[1] ?? null
-  const top3 = leaderboard[2] ?? null
-  const runnersUp = leaderboard.slice(3)
+  const top1 = topMembers[0] ?? null
+  const top2 = topMembers[1] ?? null
+  const top3 = topMembers[2] ?? null
+  const ranks4To6 = topMembers.slice(3, 6)
 
   const currentWeek = currentDay > 0 ? Math.ceil(currentDay / 7) : 1
 
@@ -158,6 +201,18 @@ export default async function LeaderboardPage() {
         </button>
       </section>
 
+      {/* ── Error Banner (if RPC call fails) ──────────────────── */}
+      {leaderboardError && (
+        <section className="mt-4">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3.5 text-xs text-red-600 dark:text-red-400">
+            <p className="font-semibold flex items-center gap-1.5">
+              <AlertTriangle size={15} /> Unable to Load Fellowship Standings
+            </p>
+            <p className="mt-1 opacity-90 leading-relaxed">{leaderboardError}</p>
+          </div>
+        </section>
+      )}
+
       {/* ── The Spiritual Podium ──────────────────────────────── */}
       <section className="mt-4">
         <div className="flex items-center justify-between mb-2.5">
@@ -173,7 +228,7 @@ export default async function LeaderboardPage() {
         {/* Rank #1 Crown Card */}
         {top1 ? (
           <div className={`bg-[var(--bg-surface)] rounded-xl p-4 border relative overflow-hidden transition-all ${
-            top1.id === userProfile.id
+            top1.user_id === userProfile.id
               ? 'border-[var(--flame-accent)] ring-2 ring-[var(--flame-accent)]/30'
               : 'border-[var(--flame-accent)]/40'
           }`}>
@@ -196,7 +251,7 @@ export default async function LeaderboardPage() {
                     <Crown size={12} strokeWidth={1.75} />
                     First Watch Crown
                   </span>
-                  {top1.id === userProfile.id && (
+                  {top1.user_id === userProfile.id && (
                     <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.2 rounded shadow-2xs">
                       You
                     </span>
@@ -220,7 +275,7 @@ export default async function LeaderboardPage() {
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-hairline)]">
               <span className="text-xs text-[var(--olive-accent)] font-semibold">
-                {top1.total_completed} Activities Done
+                {top1.total_activities_completed} Activities Done
               </span>
               <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--flame-accent)]">
                 <Flame size={13} strokeWidth={1.75} />
@@ -239,145 +294,277 @@ export default async function LeaderboardPage() {
           </div>
         )}
 
-        {/* Rank #2 and #3 Side-by-Side (Renders gracefully even with partial data) */}
-        {top1 && (
+        {/* Rank #2 and #3 Side-by-Side (No empty placeholder rows if fewer than 3 members) */}
+        {top1 && top2 && top3 && (
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {/* Rank 2 */}
-            {top2 ? (
-              <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
-                top2.id === userProfile.id
-                  ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
-                  : 'border-[var(--border-hairline)]'
-              }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="relative">
-                    <UserAvatar
-                      avatarUrl={top2.avatar_url}
-                      name={top2.full_name}
-                      size="md"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {top2.id === userProfile.id && (
-                      <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
-                        You
-                      </span>
-                    )}
-                    <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
-                      #2
-                    </span>
-                  </div>
+            <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
+              top2.user_id === userProfile.id
+                ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
+                : 'border-[var(--border-hairline)]'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="relative">
+                  <UserAvatar
+                    avatarUrl={top2.avatar_url}
+                    name={top2.full_name}
+                    size="md"
+                  />
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
-                    {top2.full_name}
-                  </h4>
-                  {top2.display_tag && (
-                    <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
-                      {top2.display_tag}
+                <div className="flex items-center gap-1">
+                  {top2.user_id === userProfile.id && (
+                    <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                      You
                     </span>
                   )}
-                </div>
-                <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
-                  {top2.fellowship_unit || 'General Assembly'}
-                </p>
-                <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
-                  <span className="font-semibold text-[var(--olive-accent)]">
-                    {top2.total_completed} Done
-                  </span>
-                  <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
-                    <Flame size={11} strokeWidth={1.75} />
-                    {top2.current_streak}d
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-[var(--bg-surface)]/70 rounded-xl p-3 border border-dashed border-[var(--border-subtle)] flex flex-col justify-between">
-                <div>
-                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)] inline-block mb-2">
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
                     #2
                   </span>
-                  <div className="w-8 h-8 rounded-full bg-[var(--bg-subtle)] border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] mb-1.5 text-xs font-semibold">
-                    2
-                  </div>
-                  <p className="font-medium text-[var(--text-ink)] text-xs">Open Position</p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Complete disciplines to rank</p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-[var(--border-hairline)] text-[10px] text-[var(--text-muted)] font-medium">
-                  Podium Rank #2
                 </div>
               </div>
-            )}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
+                  {top2.full_name}
+                </h4>
+                {top2.display_tag && (
+                  <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                    {top2.display_tag}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+                {top2.fellowship_unit || 'General Assembly'}
+              </p>
+              <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-[var(--olive-accent)]">
+                  {top2.total_activities_completed} Done
+                </span>
+                <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
+                  <Flame size={11} strokeWidth={1.75} />
+                  {top2.current_streak}d
+                </span>
+              </div>
+            </div>
 
             {/* Rank 3 */}
-            {top3 ? (
-              <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
-                top3.id === userProfile.id
-                  ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
-                  : 'border-[var(--border-hairline)]'
-              }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="relative">
-                    <UserAvatar
-                      avatarUrl={top3.avatar_url}
-                      name={top3.full_name}
-                      size="md"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {top3.id === userProfile.id && (
-                      <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
-                        You
-                      </span>
-                    )}
-                    <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
-                      #3
-                    </span>
-                  </div>
+            <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
+              top3.user_id === userProfile.id
+                ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
+                : 'border-[var(--border-hairline)]'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="relative">
+                  <UserAvatar
+                    avatarUrl={top3.avatar_url}
+                    name={top3.full_name}
+                    size="md"
+                  />
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
-                    {top3.full_name}
-                  </h4>
-                  {top3.display_tag && (
-                    <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
-                      {top3.display_tag}
+                <div className="flex items-center gap-1">
+                  {top3.user_id === userProfile.id && (
+                    <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                      You
                     </span>
                   )}
-                </div>
-                <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
-                  {top3.fellowship_unit || 'General Assembly'}
-                </p>
-                <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
-                  <span className="font-semibold text-[var(--olive-accent)]">
-                    {top3.total_completed} Done
-                  </span>
-                  <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
-                    <Flame size={11} strokeWidth={1.75} />
-                    {top3.current_streak}d
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-[var(--bg-surface)]/70 rounded-xl p-3 border border-dashed border-[var(--border-subtle)] flex flex-col justify-between">
-                <div>
-                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)] inline-block mb-2">
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
                     #3
                   </span>
-                  <div className="w-8 h-8 rounded-full bg-[var(--bg-subtle)] border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] mb-1.5 text-xs font-semibold">
-                    3
-                  </div>
-                  <p className="font-medium text-[var(--text-ink)] text-xs">Open Position</p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Complete disciplines to rank</p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-[var(--border-hairline)] text-[10px] text-[var(--text-muted)] font-medium">
-                  Podium Rank #3
                 </div>
               </div>
-            )}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
+                  {top3.full_name}
+                </h4>
+                {top3.display_tag && (
+                  <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                    {top3.display_tag}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+                {top3.fellowship_unit || 'General Assembly'}
+              </p>
+              <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-[var(--olive-accent)]">
+                  {top3.total_activities_completed} Done
+                </span>
+                <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
+                  <Flame size={11} strokeWidth={1.75} />
+                  {top3.current_streak}d
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* If only Rank 2 exists (fewer than 3 members), render clean single card without empty rank 3 */}
+        {top1 && top2 && !top3 && (
+          <div className="mt-2.5">
+            <div className={`bg-[var(--bg-surface)] rounded-xl p-3 border relative transition-all ${
+              top2.user_id === userProfile.id
+                ? 'border-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/30'
+                : 'border-[var(--border-hairline)]'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="relative">
+                  <UserAvatar
+                    avatarUrl={top2.avatar_url}
+                    name={top2.full_name}
+                    size="md"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  {top2.user_id === userProfile.id && (
+                    <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                      You
+                    </span>
+                  )}
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-1.5 py-0.5 rounded border border-[var(--border-hairline)]">
+                    #2
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="font-semibold text-[var(--text-ink)] text-xs truncate">
+                  {top2.full_name}
+                </h4>
+                {top2.display_tag && (
+                  <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                    {top2.display_tag}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+                {top2.fellowship_unit || 'General Assembly'}
+              </p>
+              <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-[var(--olive-accent)]">
+                  {top2.total_activities_completed} Done
+                </span>
+                <span className="font-medium text-[var(--flame-accent)] flex items-center gap-0.5">
+                  <Flame size={11} strokeWidth={1.75} />
+                  {top2.current_streak}d
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </section>
+
+      {/* ── Ranks 4 to 6 List ──────────────────────────────────── */}
+      {ranks4To6.length > 0 && (
+        <section className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider">
+              Fellowship Standings
+            </h3>
+            <span className="text-xs text-[var(--text-muted)]">
+              Ranks #4 – #{Math.min(6, members.length)}
+            </span>
+          </div>
+
+          <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-hairline)] divide-y divide-[var(--border-hairline)] overflow-hidden shadow-xs">
+            {ranks4To6.map((member) => {
+              const isCurrentUser = member.user_id === userProfile.id
+              return (
+                <div
+                  key={member.user_id}
+                  className={`p-3 flex items-center justify-between transition ${
+                    isCurrentUser
+                      ? 'bg-[var(--flame-subtle)] border-l-4 border-l-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/20'
+                      : 'hover:bg-[var(--bg-subtle)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-5 text-center text-xs font-bold ${
+                        isCurrentUser ? 'text-[var(--flame-accent)]' : 'text-[var(--text-muted)]'
+                      }`}
+                    >
+                      #{member.rank}
+                    </span>
+                    <UserAvatar
+                      avatarUrl={member.avatar_url}
+                      name={member.full_name}
+                      size="sm"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p
+                          className={`font-semibold text-xs ${
+                            isCurrentUser ? 'text-[var(--flame-accent)]' : 'text-[var(--text-ink)]'
+                          }`}
+                        >
+                          {member.full_name}
+                        </p>
+                        {isCurrentUser && (
+                          <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.2 rounded shadow-2xs">
+                            You
+                          </span>
+                        )}
+                        {member.display_tag && (
+                          <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
+                            {member.display_tag}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        <span className="font-semibold text-[var(--olive-accent)]">
+                          {member.total_activities_completed}
+                        </span>{' '}
+                        Done
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-2 py-0.5 rounded-md border border-[var(--border-hairline)]">
+                      <Flame size={12} strokeWidth={1.75} />
+                      {member.current_streak}d
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ── More People Element (if total_ranked_members > 6) ───── */}
+      {totalRankedMembers > 6 && (
+        <div className="mt-3 flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-hairline)] text-xs text-[var(--text-muted)] shadow-2xs">
+          <div className="flex -space-x-1.5 overflow-hidden">
+            {Array.from({ length: Math.min(4, totalRankedMembers - 6) }).map((_, idx) => (
+              <div
+                key={idx}
+                className="w-5 h-5 rounded-full bg-[var(--bg-subtle)] border border-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center text-[8px] font-semibold text-[var(--text-muted)]"
+              >
+                {['✦', '✧', '•', '·'][idx % 4]}
+              </div>
+            ))}
+          </div>
+          <span className="text-xs font-medium text-[var(--text-muted)]">
+            and {totalRankedMembers - 6}{' '}
+            {totalRankedMembers - 6 === 1 ? 'other' : 'others'} pressing on with you
+          </span>
+        </div>
+      )}
+
+      {/* ── Private Card for Current Member Outside Top 6 ─────── */}
+      {!isInsideTop6 && userProfile.role === 'member' && (
+        <div className="mt-3 p-3.5 rounded-xl bg-[var(--flame-subtle)] border border-[var(--flame-accent)]/20 text-xs text-[var(--text-ink)] shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="w-6 h-6 rounded-full bg-[var(--flame-accent)]/15 text-[var(--flame-accent)] font-bold text-[11px] flex items-center justify-center border border-[var(--flame-accent)]/30 shrink-0">
+              #{effectiveUserRank ?? '—'}
+            </span>
+            <p className="leading-snug">
+              You&apos;re ranked <span className="font-semibold text-[var(--flame-accent)]">#{effectiveUserRank ?? '—'}</span> with{' '}
+              <span className="font-semibold text-[var(--olive-accent)]">{myTotalActivities || userActivitiesCount}</span>{' '}
+              {(myTotalActivities || userActivitiesCount) === 1 ? 'activity' : 'activities'} completed. Keep going!
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Current User Standing Card ────────────────────────── */}
       {userProfile && (
@@ -412,7 +599,7 @@ export default async function LeaderboardPage() {
 
               <div className="text-right">
                 <span className="text-lg font-bold text-[var(--flame-accent)] leading-none">
-                  #{userRank ?? '-'}
+                  #{userRankDisplay}
                 </span>
                 <p className="text-[10px] text-[var(--text-muted)]">Rank</p>
               </div>
@@ -552,95 +739,6 @@ export default async function LeaderboardPage() {
           </div>
         </div>
       </section>
-
-      {/* ── Fellowship Roll of Honor ──────────────────────────── */}
-      {runnersUp.length > 0 ? (
-        <section className="mt-5">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider">
-              Fellowship Roll of Honor
-            </h3>
-            <span className="text-xs text-[var(--text-muted)]">
-              Ranks #4 – #{leaderboard.length}
-            </span>
-          </div>
-
-          <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-hairline)] divide-y divide-[var(--border-hairline)] overflow-hidden">
-            {runnersUp.map((member) => {
-              const isCurrentUser = member.id === userProfile.id
-              return (
-                <div
-                  key={member.id}
-                  className={`p-3 flex items-center justify-between transition ${
-                    isCurrentUser
-                      ? 'bg-[var(--flame-subtle)] border-l-4 border-l-[var(--flame-accent)] ring-1 ring-[var(--flame-accent)]/20'
-                      : 'hover:bg-[var(--bg-subtle)]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-5 text-center text-xs font-bold ${
-                      isCurrentUser ? 'text-[var(--flame-accent)]' : 'text-[var(--text-muted)]'
-                    }`}>
-                      #{member.rank}
-                    </span>
-                    <UserAvatar
-                      avatarUrl={member.avatar_url}
-                      name={member.full_name}
-                      size="sm"
-                    />
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className={`font-semibold text-xs ${
-                          isCurrentUser ? 'text-[var(--flame-accent)]' : 'text-[var(--text-ink)]'
-                        }`}>
-                          {member.full_name}
-                        </p>
-                        {isCurrentUser && (
-                          <span className="text-[9px] bg-[var(--flame-accent)] text-white font-bold px-1.5 py-0.2 rounded shadow-2xs">
-                            You
-                          </span>
-                        )}
-                        {member.display_tag && (
-                          <span className="text-[9px] font-medium text-[var(--olive-accent)] bg-[var(--olive-accent)]/10 px-1.5 py-0.5 rounded border border-[var(--olive-accent)]/20">
-                            {member.display_tag}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[var(--text-muted)]">
-                        {member.fellowship_unit || 'General Assembly'} · <span className="font-semibold text-[var(--olive-accent)]">{member.total_completed}</span> Done
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--flame-accent)] bg-[var(--bg-subtle)] px-2 py-0.5 rounded-md border border-[var(--border-hairline)]">
-                      <Flame size={12} strokeWidth={1.75} />
-                      {member.current_streak}d
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      ) : leaderboard.length > 0 && leaderboard.length <= 3 ? (
-        <section className="mt-5">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider">
-              Fellowship Roll of Honor
-            </h3>
-            <span className="text-xs text-[var(--text-muted)]">Ranks #4 and beyond</span>
-          </div>
-          <div className="bg-[var(--bg-surface)] rounded-xl p-5 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-hairline)]">
-            <p className="text-xs font-medium text-[var(--text-ink)] mb-0.5">
-              Roll of Honor Open
-            </p>
-            <p className="text-[11px]">
-              Additional approved disciples will appear here as they complete consecration disciplines.
-            </p>
-          </div>
-        </section>
-      ) : null}
 
       {/* ── Scripture Exhortation ─────────────────────────────── */}
       <section className="mt-5 mb-3">
