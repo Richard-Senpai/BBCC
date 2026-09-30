@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { sendPushToUsers } from '@/lib/push-server'
 import type { Announcement } from '@/lib/types'
 
 /**
@@ -64,6 +65,29 @@ export async function createAnnouncement(
     if (error) {
       console.error('[createAnnouncement] Error creating announcement:', error)
       return { success: false, error: error.message || 'Failed to post announcement.' }
+    }
+
+    // ── Dispatch Real Device Push Notification ──────────────────────────────
+    // Immediately notify all approved members who have announcements_enabled ON.
+    try {
+      const { data: approvedMembers } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('status', 'approved')
+
+      if (approvedMembers && approvedMembers.length > 0) {
+        const memberIds = approvedMembers.map((m) => m.id)
+        sendPushToUsers(memberIds, 'announcements', {
+          title: cleanTitle,
+          body: cleanBody.length > 140 ? `${cleanBody.slice(0, 137)}...` : cleanBody,
+          url: '/dashboard/profile#announcements',
+          tag: `announcement-${data.id}`,
+        }).catch((pushErr) => {
+          console.error('[createAnnouncement] Error dispatching push notification:', pushErr)
+        })
+      }
+    } catch (pushDispatchErr) {
+      console.error('[createAnnouncement] Failed to initiate push notification dispatch:', pushDispatchErr)
     }
 
     revalidatePath('/dashboard/profile')

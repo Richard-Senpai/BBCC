@@ -12,6 +12,10 @@ export type Profile = {
   display_tag?: string | null
   avatar_url?: string | null
   last_seen_announcements_at?: string | null
+  last_seen_chat_at?: string | null
+  new_day_enabled?: boolean
+  announcements_enabled?: boolean
+  chat_enabled?: boolean
   created_at: string
 }
 
@@ -21,7 +25,37 @@ export type ChallengeSettings = {
   timezone: string
   duration_days: number
   challenge_name: string
+  last_notified_challenge_day?: number
   updated_at: string
+}
+
+export type PushSubscriptionRecord = {
+  id: string
+  user_id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  created_at: string
+}
+
+export type PushCategory = 'new_day' | 'announcements' | 'chat'
+
+export type PushPayload = {
+  title: string
+  body: string
+  url?: string
+  tag?: string
+  icon?: string
+  badge?: string
+}
+
+export type PushDispatchResult = {
+  success: boolean
+  error?: string
+  eligibleUsers: number
+  sent: number
+  failed: number
+  cleaned: number
 }
 
 export type ChallengeDay = {
@@ -160,6 +194,10 @@ export type Database = {
           display_tag?: string | null
           avatar_url?: string | null
           last_seen_announcements_at?: string | null
+          last_seen_chat_at?: string | null
+          new_day_enabled?: boolean
+          announcements_enabled?: boolean
+          chat_enabled?: boolean
           created_at?: string
         }
         Update: {
@@ -173,6 +211,30 @@ export type Database = {
           display_tag?: string | null
           avatar_url?: string | null
           last_seen_announcements_at?: string | null
+          last_seen_chat_at?: string | null
+          new_day_enabled?: boolean
+          announcements_enabled?: boolean
+          chat_enabled?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: PushSubscriptionRecord
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
           created_at?: string
         }
         Relationships: []
@@ -185,6 +247,7 @@ export type Database = {
           timezone?: string
           duration_days?: number
           challenge_name?: string
+          last_notified_challenge_day?: number
           updated_at?: string
         }
         Update: {
@@ -193,6 +256,7 @@ export type Database = {
           timezone?: string
           duration_days?: number
           challenge_name?: string
+          last_notified_challenge_day?: number
           updated_at?: string
         }
         Relationships: []
@@ -414,6 +478,10 @@ export type Database = {
       }
       seed_default_40_days: {
         Args: Record<string, never>
+        Returns: void
+      }
+      delete_expired_push_subscription: {
+        Args: { target_endpoint: string }
         Returns: void
       }
     }

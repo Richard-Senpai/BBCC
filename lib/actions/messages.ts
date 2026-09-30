@@ -74,6 +74,12 @@ export async function postMessage(
       return { success: false, error: error.message || 'Failed to send message.' }
     }
 
+    // Keep the author's own last_seen_chat_at up to date
+    await supabase
+      .from('profiles')
+      .update({ last_seen_chat_at: new Date().toISOString() })
+      .eq('id', user.id)
+
     revalidatePath('/community')
     return { success: true, message: data as Message }
   } catch (err) {
@@ -166,3 +172,100 @@ export async function deleteMessage(
     }
   }
 }
+
+/**
+ * Update member's last seen timestamp for community chat.
+ * Clears the unread chat indicator across navigation.
+ */
+export async function markChatAsSeen(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: 'Unauthenticated: please sign in.' }
+    }
+
+    const now = new Date().toISOString()
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ last_seen_chat_at: now })
+      .eq('id', user.id)
+
+    if (error) {
+      console.error('[markChatAsSeen] Error updating last_seen_chat_at:', error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/community')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/progress')
+    revalidatePath('/leaderboard')
+    revalidatePath('/dashboard/profile')
+
+    return { success: true }
+  } catch (err) {
+    console.error('[markChatAsSeen] Unexpected error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to mark chat as seen.',
+    }
+  }
+}
+
+/**
+ * Check if current member has unread community chat messages.
+ * Unread = exists at least one message in the messages table with
+ * created_at > the member's last_seen_chat_at, sent by someone other than themselves.
+ */
+export async function getChatUnreadStatus(): Promise<{ unread: boolean; lastSeenAt?: string | null }> {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { unread: false }
+    }
+
+    const { data: profile, error: profError } = await supabase
+      .from('profiles')
+      .select('last_seen_chat_at')
+      .eq('id', user.id)
+      .single()
+
+    if (profError || !profile || !profile.last_seen_chat_at) {
+      return { unread: false }
+    }
+
+    // Query for any message newer than member's last_seen_chat_at sent by someone other than themselves
+    const { data: unreadMsg, error: msgError } = await supabase
+      .from('messages')
+      .select('id')
+      .gt('created_at', profile.last_seen_chat_at)
+      .neq('user_id', user.id)
+      .limit(1)
+
+    if (msgError) {
+      console.error('[getChatUnreadStatus] Error checking messages:', msgError)
+      return { unread: false, lastSeenAt: profile.last_seen_chat_at }
+    }
+
+    return {
+      unread: Boolean(unreadMsg && unreadMsg.length > 0),
+      lastSeenAt: profile.last_seen_chat_at,
+    }
+  } catch (err) {
+    console.error('[getChatUnreadStatus] Unexpected error:', err)
+    return { unread: false }
+  }
+}
+
