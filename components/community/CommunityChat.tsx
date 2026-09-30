@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Sparkles, MessageSquare, Send, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { postMessage, deleteMessage } from '@/lib/actions/messages'
+import { postMessage, deleteMessage, markChatAsSeen } from '@/lib/actions/messages'
 import UserAvatar from '@/components/UserAvatar'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
@@ -75,7 +75,14 @@ export default function CommunityChat({
     messagesEndRef.current?.scrollIntoView({ behavior })
   }
 
-  // 1. Fetch complete message history from Supabase on mount (guarantees history persists across sessions)
+  // 1. Auto-clear unread chat indicator when member opens chat page (same pattern as announcements bell)
+  useEffect(() => {
+    markChatAsSeen().catch((err) => {
+      console.error('Failed to mark chat as seen on mount:', err)
+    })
+  }, [])
+
+  // 2. Fetch complete message history from Supabase on mount (guarantees history persists across sessions)
   useEffect(() => {
     async function loadMessageHistory() {
       const supabase = createClient()
@@ -105,7 +112,7 @@ export default function CommunityChat({
     loadMessageHistory()
   }, [])
 
-  // 2. Subscribe to Supabase Realtime for live messages and deletions
+  // 3. Subscribe to Supabase Realtime for live messages and deletions
   useEffect(() => {
     const supabase = createClient()
 
@@ -121,6 +128,13 @@ export default function CommunityChat({
             content: string | null
             image_url: string | null
             created_at: string
+          }
+
+          // If message is from someone else while user is actively reading chat, update last_seen
+          if (newRow.user_id !== currentUserId) {
+            markChatAsSeen().catch((err) => {
+              console.error('Failed to update last_seen_chat_at for live message:', err)
+            })
           }
 
           // Check if already in state (e.g. from optimistic update)

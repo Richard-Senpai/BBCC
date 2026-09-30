@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import AvatarUploader from '@/components/profile/AvatarUploader'
 import AnnouncementsSection from '@/components/profile/AnnouncementsSection'
+import NotificationSettingsSection from '@/components/profile/NotificationSettingsSection'
 import MyJournalSection from '@/components/dashboard/MyJournalSection'
 import type { Profile, MemberStats, AnnouncementWithAuthor } from '@/lib/types'
 
@@ -175,6 +176,18 @@ export default async function ProfilePage() {
       {/* My Spiritual Reflections Section */}
       <section className="px-4">
         <MyJournalSection />
+      </section>
+
+      {/* Device Push Notifications */}
+      <section className="px-4 mt-4">
+        <NotificationSettingsSection
+          userId={profile.id}
+          initialPrefs={{
+            new_day_enabled: profile.new_day_enabled ?? true,
+            announcements_enabled: profile.announcements_enabled ?? true,
+            chat_enabled: profile.chat_enabled ?? false,
+          }}
+        />
       </section>
 
       {/* Announcements */}

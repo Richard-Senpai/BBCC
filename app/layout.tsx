@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Newsreader } from 'next/font/google'
+import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
 import './globals.css'
 
 const sans = Plus_Jakarta_Sans({
@@ -60,6 +61,7 @@ export default function RootLayout({
       <body
         className={`${sans.variable} ${serif.variable} font-sans antialiased selection:bg-amber-500/20 selection:text-amber-900 dark:selection:text-amber-200`}
       >
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>
