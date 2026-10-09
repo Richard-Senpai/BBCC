@@ -1,6 +1,6 @@
 # BBCCILEIFE — 40-Day Challenge
 
-A warm, church-community web platform for tracking the BBCCILEIFE 40-Day Challenge.
+This is a warm, church-community web platform for tracking the BBCCILEIFE 40-Day Challenge.
 Built with **Next.js 14 (App Router)** + **Tailwind CSS** + **Supabase**.
 
 ---
