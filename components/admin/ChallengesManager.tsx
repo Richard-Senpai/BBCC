@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   Calendar,
   Plus,
@@ -34,9 +35,11 @@ import {
   CalendarCheck,
   Check,
   ListOrdered,
+  TrendingUp,
 } from 'lucide-react'
 import UserAvatar from '@/components/UserAvatar'
 import { LessonContentEditorModal } from '@/components/admin/course-editor/LessonContentEditorModal'
+import CourseProgressModal from '@/components/admin/CourseProgressModal'
 import {
   createChallenge,
   updateChallenge,
@@ -116,6 +119,7 @@ export default function ChallengesManager({
   const [requestsChallenge, setRequestsChallenge] = useState<ChallengeWithStats | null>(null)
   const [deletingChallenge, setDeletingChallenge] = useState<ChallengeWithStats | null>(null)
   const [courseOutlineChallenge, setCourseOutlineChallenge] = useState<ChallengeWithStats | null>(null)
+  const [progressCourse, setProgressCourse] = useState<ChallengeWithStats | null>(null)
 
   // Quick actions
   const [togglingPublishId, setTogglingPublishId] = useState<string | null>(null)
@@ -479,6 +483,34 @@ export default function ChallengesManager({
                         </button>
                       )}
 
+                      {isCourse && (
+                        <>
+                          <Link
+                            href={`/courses/${c.id}?preview=true`}
+                            target="_blank"
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-2 py-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 rounded-md border border-purple-500/20 transition flex items-center gap-1 cursor-pointer"
+                            title="Preview course as member (no progress recorded)"
+                          >
+                            <Eye size={12} />
+                            <span>Preview</span>
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setProgressCourse(c)
+                            }}
+                            className="px-2 py-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 rounded-md border border-purple-500/20 transition flex items-center gap-1 cursor-pointer"
+                            title="View member progress, lesson drop-off, and CSV export"
+                          >
+                            <TrendingUp size={12} />
+                            <span>Progress</span>
+                          </button>
+                        </>
+                      )}
+
                       <button
                         type="button"
                         onClick={(e) => {
@@ -539,6 +571,16 @@ export default function ChallengesManager({
           onUpdated={() => {
             router.refresh()
           }}
+        />
+      )}
+
+      {/* ── COURSE PROGRESS & ANALYTICS MODAL ─────────────────── */}
+      {progressCourse && (
+        <CourseProgressModal
+          courseId={progressCourse.id}
+          courseName={progressCourse.name}
+          isOpen={Boolean(progressCourse)}
+          onClose={() => setProgressCourse(null)}
         />
       )}
 

@@ -252,6 +252,8 @@ function LinkButtonBlock({
   onConfirm,
   isConfirming = false,
 }: LinkButtonBlockProps) {
+  const [hasTappedLink, setHasTappedLink] = React.useState(false)
+
   if (!content || !content.url) return null
 
   // Ensure URL is strictly http:// or https://
@@ -283,6 +285,7 @@ function LinkButtonBlock({
           href={safeUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => setHasTappedLink(true)}
           className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-white text-white dark:text-stone-900 font-medium text-sm transition shadow-2xs shrink-0 cursor-pointer"
         >
           <span>{content.label || 'Open Resource'}</span>
@@ -292,23 +295,32 @@ function LinkButtonBlock({
 
       {/* Required Confirmation Check for Members */}
       {required && (
-        <div className="pt-3 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between gap-3">
+        <div className="pt-3 border-t border-stone-200 dark:border-stone-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           {isMemberView ? (
             isConfirmed ? (
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 fill-emerald-100 dark:fill-emerald-950" />
-                <span>You have confirmed completion of this external task.</span>
+                <span>You&apos;ve confirmed completion of this step.</span>
+              </div>
+            ) : hasTappedLink ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full animate-in fade-in">
+                <span className="text-xs text-stone-500 dark:text-stone-400">
+                  Did you finish the test or task at the link?
+                </span>
+                <button
+                  type="button"
+                  disabled={isConfirming}
+                  onClick={() => onConfirm && onConfirm(blockId)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 transition cursor-pointer disabled:opacity-50"
+                >
+                  <FileCheck2 className="w-3.5 h-3.5" />
+                  <span>{isConfirming ? 'Saving confirmation...' : "I've done this"}</span>
+                </button>
               </div>
             ) : (
-              <button
-                type="button"
-                disabled={isConfirming}
-                onClick={() => onConfirm && onConfirm(blockId)}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 transition cursor-pointer disabled:opacity-50"
-              >
-                <FileCheck2 className="w-3.5 h-3.5" />
-                <span>{isConfirming ? 'Confirming...' : "I've done this"}</span>
-              </button>
+              <div className="text-xs text-amber-700 dark:text-amber-400 italic">
+                Tap the link button above to open the test or resource.
+              </div>
             )
           ) : (
             <div className="text-xs text-stone-500 dark:text-stone-400 italic">

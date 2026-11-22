@@ -33,11 +33,13 @@ import {
   type HubChallengeItem,
   type HubDataResponse,
 } from '@/lib/actions/challenges'
-import type { Profile } from '@/lib/types'
+import type { Profile, HubCourseItem } from '@/lib/types'
+import MemberCoursesSection from '@/components/courses/MemberCoursesSection'
 
 interface ChallengeHubViewProps {
   profile: Profile
   hubData: HubDataResponse
+  courses?: HubCourseItem[]
   unreadCount?: number
 }
 
@@ -90,6 +92,7 @@ function calculateCountdown(startDateStr: string, timezone = 'Africa/Lagos') {
 export default function ChallengeHubView({
   profile,
   hubData,
+  courses = [],
   unreadCount = 0,
 }: ChallengeHubViewProps) {
   const router = useRouter()
@@ -437,6 +440,9 @@ export default function ChallengeHubView({
             </div>
           )}
         </section>
+
+        {/* ── SECTION: SELF-PACED COURSES ───────────────────── */}
+        <MemberCoursesSection courses={courses} profile={profile} />
 
         {/* ── SECTION 2: UPCOMING CHALLENGES ─────────────────── */}
         {upcomingChallenges.length > 0 && (

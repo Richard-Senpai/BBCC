@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getMemberHubData } from '@/lib/actions/challenges'
+import { getMemberCoursesHubData } from '@/lib/actions/courses'
 import ChallengeHubView from '@/components/hub/ChallengeHubView'
 import type { Profile } from '@/lib/types'
 
@@ -50,12 +51,17 @@ export default async function HubPage() {
   }
 
   // Fetch hub data (active challenge, upcoming challenges, completed challenges)
-  const hubData = await getMemberHubData()
+  // and published self-paced courses concurrently
+  const [hubData, courses] = await Promise.all([
+    getMemberHubData(),
+    getMemberCoursesHubData(),
+  ])
 
   return (
     <ChallengeHubView
       profile={profile}
       hubData={hubData}
+      courses={courses}
       unreadCount={unreadCount}
     />
   )

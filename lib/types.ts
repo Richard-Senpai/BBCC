@@ -218,6 +218,83 @@ export type CourseBlockConfirmation = {
   confirmed_at: string
 }
 
+export type MemberCourseCardState =
+  | 'start'
+  | 'continue'
+  | 'request_join'
+  | 'awaiting_approval'
+  | 'rejected'
+  | 'completed'
+  | 'access_ended'
+
+export interface HubCourseItem {
+  id: string
+  name: string
+  description: string | null
+  enrollment_mode: EnrollmentMode
+  access_mode: CourseAccessMode | null
+  access_end_date: string | null
+  access_days: number | null
+  timezone: string
+  is_published: boolean
+  total_lessons: number
+  lessons_completed: number
+  progress_pct: number
+  is_started: boolean
+  started_at: string | null
+  completed_at: string | null
+  access_override_until: string | null
+  is_access_expired: boolean
+  access_expiry_date: string | null
+  days_until_expiry: number | null
+  user_enrollment_status: 'none' | 'pending' | 'approved' | 'rejected'
+  can_access: boolean
+  card_state: MemberCourseCardState
+  next_uncompleted_lesson_id: string | null
+}
+
+export type LessonOutlineStatus = 'completed' | 'current' | 'locked'
+
+export interface MemberLessonOutlineItem {
+  id: string
+  position: number
+  title: string
+  summary: string | null
+  status: LessonOutlineStatus
+}
+
+export interface CourseMemberProgressMember {
+  user_id: string
+  full_name: string
+  email: string
+  avatar_url: string | null
+  started_at: string
+  completed_at: string | null
+  access_override_until: string | null
+  lessons_completed_count: number
+  last_activity_at: string | null
+}
+
+export interface CourseProgressSummary {
+  course_id: string
+  course_name: string
+  total_lessons: number
+  started_count: number
+  completed_count: number
+  access_mode: CourseAccessMode | null
+  access_end_date: string | null
+  access_days: number | null
+  timezone: string
+  lessons: Array<{
+    id: string
+    position: number
+    title: string
+    summary: string | null
+    completed_count: number
+  }>
+  members: CourseMemberProgressMember[]
+}
+
 export type ChallengeSettings = {
   id: 1
   start_date: string | null

@@ -19,6 +19,7 @@ import type {
   CourseLesson,
   CourseBlock,
   CourseBlockType,
+  CourseProgressSummary,
 } from '@/lib/types'
 import { sanitizeHtml } from '@/lib/sanitize'
 
@@ -2499,3 +2500,123 @@ export async function updateMemberDisplayTag(
     }
   }
 }
+
+/**
+ * Admin action to fetch detailed course progress, lesson completion counts, and per-member table.
+ */
+export async function getCourseProgressData(courseId: string): Promise<{
+  success: boolean
+  data?: CourseProgressSummary
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // 1. Try get_course_progress_summary RPC first
+    const { data: rpcData, error: rpcErr } = await (supabase.rpc as any)('get_course_progress_summary', {
+      target_course_id: courseId,
+    })
+
+    if (!rpcErr && rpcData) {
+      return { success: true, data: rpcData as unknown as CourseProgressSummary }
+    }
+
+    // 2. Direct query fallback
+    const { data: course, error: cErr } = await supabase
+      .from('challenges')
+      .select('id, name, access_mode, access_end_date, access_days, timezone')
+      .eq('id', courseId)
+      .single()
+
+    if (cErr || !course) {
+      return { success: false, error: 'Course not found' }
+    }
+
+    const { data: rawLessons } = await supabase
+      .from('course_lessons')
+      .select('id, position, title, summary')
+      .eq('challenge_id', courseId)
+      .order('position', { ascending: true })
+
+    const lessonsList = rawLessons ?? []
+    const lessonIds = lessonsList.map((l) => l.id)
+
+    const [memberStateRes, completionsRes] = await Promise.all([
+      supabase
+        .from('course_member_state')
+        .select('user_id, started_at, completed_at, access_override_until, profiles(id, full_name, email, avatar_url)')
+        .eq('challenge_id', courseId),
+      lessonIds.length > 0
+        ? supabase
+            .from('course_lesson_completions')
+            .select('lesson_id, user_id, completed_at')
+            .in('lesson_id', lessonIds)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    const rawMembers = memberStateRes.data ?? []
+    const completions = completionsRes.data ?? []
+
+    const lessonCountMap = new Map<string, number>()
+    for (const c of completions) {
+      lessonCountMap.set(c.lesson_id, (lessonCountMap.get(c.lesson_id) ?? 0) + 1)
+    }
+
+    const lessonsData = lessonsList.map((l) => ({
+      id: l.id,
+      position: l.position,
+      title: l.title,
+      summary: l.summary,
+      completed_count: lessonCountMap.get(l.id) ?? 0,
+    }))
+
+    const membersData = rawMembers.map((m: any) => {
+      const userCompletions = completions.filter((c) => c.user_id === m.user_id)
+      const lastActivity =
+        userCompletions.length > 0
+          ? userCompletions.reduce(
+              (latest, c) => (c.completed_at > latest ? c.completed_at : latest),
+              userCompletions[0].completed_at
+            )
+          : null
+
+      return {
+        user_id: m.user_id,
+        full_name: m.profiles?.full_name || 'Anonymous Member',
+        email: m.profiles?.email || '',
+        avatar_url: m.profiles?.avatar_url || null,
+        started_at: m.started_at,
+        completed_at: m.completed_at,
+        access_override_until: m.access_override_until,
+        lessons_completed_count: userCompletions.length,
+        last_activity_at: lastActivity,
+      }
+    })
+
+    const startedCount = rawMembers.length
+    const completedCount = rawMembers.filter((m) => m.completed_at !== null).length
+
+    return {
+      success: true,
+      data: {
+        course_id: course.id,
+        course_name: course.name,
+        total_lessons: lessonsList.length,
+        started_count: startedCount,
+        completed_count: completedCount,
+        access_mode: (course.access_mode as CourseAccessMode) || null,
+        access_end_date: course.access_end_date ?? null,
+        access_days: course.access_days ?? null,
+        timezone: course.timezone || 'Africa/Lagos',
+        lessons: lessonsData,
+        members: membersData,
+      },
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to fetch course progress',
+    }
+  }
+}
+
