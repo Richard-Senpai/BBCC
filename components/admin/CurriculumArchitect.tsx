@@ -520,6 +520,20 @@ export default function CurriculumArchitect({
     (n) => daysCache.has(n) && (daysCache.get(n)?.activities?.length ?? 0) > 0
   ).length
 
+  if (challenges.length === 0) {
+    return (
+      <section id="curriculum-architect" className="bg-[var(--bg-surface)] rounded-xl p-8 shadow-xs border border-[var(--border-hairline)] mt-6 text-center transition-colors">
+        <div className="w-12 h-12 rounded-2xl bg-[var(--bg-subtle)] text-[var(--text-muted)] mx-auto flex items-center justify-center mb-3 border border-[var(--border-hairline)]">
+          <Layers size={20} strokeWidth={1.75} />
+        </div>
+        <h4 className="text-sm font-semibold text-[var(--text-ink)]">No Consecration Challenges Created</h4>
+        <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto mt-1 leading-relaxed">
+          Create a challenge above to start designing curriculum days, spiritual disciplines, and devotional scriptures.
+        </p>
+      </section>
+    )
+  }
+
   return (
     <section id="curriculum-architect" className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors">
       {/* ── Challenge Scope Bar ── */}

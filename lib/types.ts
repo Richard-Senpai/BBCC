@@ -20,6 +20,42 @@ export type Profile = {
 }
 
 export type ChallengeStatus = 'upcoming' | 'active' | 'completed'
+export type EnrollmentMode = 'open' | 'approval'
+export type EnrollmentStatus = 'pending' | 'approved' | 'rejected'
+
+export type ChallengeEnrollment = {
+  id: string
+  challenge_id: string
+  user_id: string
+  status: EnrollmentStatus
+  requested_at: string
+  decided_at?: string | null
+  decided_by?: string | null
+}
+
+export type ChallengeEnrollmentWithUser = ChallengeEnrollment & {
+  profiles: {
+    id: string
+    full_name: string
+    email: string
+    avatar_url?: string | null
+    display_tag?: string | null
+    fellowship_unit?: string | null
+  } | null
+}
+
+export type ChallengeDeleteSummary = {
+  id: string
+  name: string
+  status: ChallengeStatus
+  days_count: number
+  activities_count: number
+  participants_count: number
+  completions_count: number
+  activity_completions_count: number
+  journal_entries_count: number
+  enrollments_count: number
+}
 
 export type Challenge = {
   id: string
@@ -27,6 +63,7 @@ export type Challenge = {
   duration_days: number
   start_date: string
   timezone: string
+  enrollment_mode: EnrollmentMode
   last_notified_challenge_day?: number
   created_at: string
 }
@@ -39,6 +76,7 @@ export type ChallengeWithStatus = Challenge & {
 
 export type ChallengeWithStats = ChallengeWithStatus & {
   participant_count: number
+  pending_requests_count?: number
 }
 
 export type ChallengeSettings = {
@@ -270,6 +308,7 @@ export type Database = {
           duration_days: number
           start_date: string
           timezone?: string
+          enrollment_mode?: EnrollmentMode
           last_notified_challenge_day?: number
           created_at?: string
         }
@@ -279,10 +318,48 @@ export type Database = {
           duration_days?: number
           start_date?: string
           timezone?: string
+          enrollment_mode?: EnrollmentMode
           last_notified_challenge_day?: number
           created_at?: string
         }
         Relationships: []
+      }
+      challenge_enrollments: {
+        Row: ChallengeEnrollment
+        Insert: {
+          id?: string
+          challenge_id: string
+          user_id: string
+          status: EnrollmentStatus
+          requested_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+        }
+        Update: {
+          id?: string
+          challenge_id?: string
+          user_id?: string
+          status?: EnrollmentStatus
+          requested_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'challenge_enrollments_challenge_id_fkey'
+            columns: ['challenge_id']
+            isOneToOne: false
+            referencedRelation: 'challenges'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'challenge_enrollments_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
       }
       challenge_settings: {
         Row: ChallengeSettings
@@ -550,6 +627,22 @@ export type Database = {
       delete_expired_push_subscription: {
         Args: { target_endpoint: string }
         Returns: void
+      }
+      can_access_challenge: {
+        Args: { target_challenge_id: string }
+        Returns: boolean
+      }
+      get_challenge_delete_summary: {
+        Args: { target_challenge_id: string }
+        Returns: ChallengeDeleteSummary
+      }
+      delete_challenge: {
+        Args: { target_challenge_id: string; confirmed_name: string }
+        Returns: { success: boolean; deleted_challenge_id: string; deleted_name: string }
+      }
+      grandfather_existing_participants: {
+        Args: { target_challenge_id: string }
+        Returns: number
       }
     }
   }

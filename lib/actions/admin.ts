@@ -1,13 +1,19 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { SELECTED_CHALLENGE_COOKIE } from '@/lib/challenge-session'
 import type {
   Profile,
   Challenge,
   ChallengeStatus,
   ChallengeWithStats,
   ChallengeDayWithActivities,
+  EnrollmentMode,
+  EnrollmentStatus,
+  ChallengeEnrollmentWithUser,
+  ChallengeDeleteSummary,
 } from '@/lib/types'
 
 function checkDateOverlap(
@@ -120,12 +126,28 @@ export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
           }
         }
 
+        let pendingRequestsCount = 0
+        if (c.enrollment_mode === 'approval') {
+          try {
+            const { count: pendingCount } = await supabase
+              .from('challenge_enrollments')
+              .select('*', { count: 'exact', head: true })
+              .eq('challenge_id', c.id)
+              .eq('status', 'pending')
+            pendingRequestsCount = pendingCount ?? 0
+          } catch {
+            pendingRequestsCount = 0
+          }
+        }
+
         return {
           ...c,
+          enrollment_mode: (c.enrollment_mode as EnrollmentMode) || 'open',
           status,
           current_day: currentDay,
           end_date: endStr,
           participant_count: participantCount,
+          pending_requests_count: pendingRequestsCount,
         }
       })
     )
@@ -147,6 +169,7 @@ export async function createChallenge(params: {
   durationDays: number
   startDate: string
   timezone?: string
+  enrollmentMode?: EnrollmentMode
 }): Promise<{
   success: boolean
   error?: string
@@ -158,6 +181,7 @@ export async function createChallenge(params: {
     const durationDays = Number(params.durationDays)
     const startDate = params.startDate.trim()
     const timezone = params.timezone?.trim() || 'Africa/Lagos'
+    const enrollmentMode: EnrollmentMode = params.enrollmentMode === 'approval' ? 'approval' : 'open'
 
     if (!name) return { success: false, error: 'Challenge name cannot be empty.' }
     if (isNaN(durationDays) || durationDays < 1 || durationDays > 365) {
@@ -200,6 +224,7 @@ export async function createChallenge(params: {
         duration_days: durationDays,
         start_date: startDate,
         timezone,
+        enrollment_mode: enrollmentMode,
       })
       .select('id')
       .single()
@@ -356,6 +381,10 @@ export async function copyChallengeDays(
  * Update challenge details (name, duration, start date, timezone).
  * Validates date range does not overlap another challenge.
  */
+/**
+ * Update challenge details (name, duration, start date, timezone, enrollment_mode).
+ * Validates date range does not overlap another challenge.
+ */
 export async function updateChallenge(
   challengeId: string,
   params: {
@@ -363,10 +392,11 @@ export async function updateChallenge(
     durationDays: number
     startDate: string
     timezone?: string
+    enrollmentMode?: EnrollmentMode
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { supabase } = await assertAdmin()
+    const { supabase, user } = await assertAdmin()
     const name = params.name.trim()
     const durationDays = Number(params.durationDays)
     const startDate = params.startDate.trim()
@@ -379,6 +409,13 @@ export async function updateChallenge(
     if (!startDate || isNaN(new Date(startDate).getTime())) {
       return { success: false, error: 'Please specify a valid start date.' }
     }
+
+    // Fetch existing challenge
+    const { data: existingChallenge } = await supabase
+      .from('challenges')
+      .select('id, name, duration_days, start_date, enrollment_mode')
+      .eq('id', challengeId)
+      .single()
 
     // Check overlap with other challenges
     const { data: otherChallenges } = await supabase
@@ -402,14 +439,87 @@ export async function updateChallenge(
       }
     }
 
+    const currentMode = existingChallenge?.enrollment_mode || 'open'
+    const targetMode = params.enrollmentMode || currentMode
+
+    // If switching Open -> Approval: grandfather existing participants
+    if (targetMode === 'approval' && currentMode !== 'approval') {
+      try {
+        await supabase.rpc('grandfather_existing_participants', { target_challenge_id: challengeId })
+      } catch {
+        // Fallback: direct query
+      }
+
+      const { data: cDays } = await supabase
+        .from('challenge_days')
+        .select('id, activities(id)')
+        .eq('challenge_id', challengeId)
+
+      const actIds: string[] = []
+      for (const d of cDays ?? []) {
+        for (const a of ((d.activities as { id: string }[]) ?? [])) {
+          actIds.push(a.id)
+        }
+      }
+
+      if (actIds.length > 0) {
+        const { data: compRows } = await supabase
+          .from('activity_completions')
+          .select('user_id')
+          .in('activity_id', actIds)
+
+        if (compRows && compRows.length > 0) {
+          const uniqueUsers = Array.from(new Set(compRows.map((r) => r.user_id)))
+          const enrollRows = uniqueUsers.map((uid) => ({
+            challenge_id: challengeId,
+            user_id: uid,
+            status: 'approved' as const,
+            requested_at: new Date().toISOString(),
+            decided_at: new Date().toISOString(),
+            decided_by: user.id,
+          }))
+
+          await supabase
+            .from('challenge_enrollments')
+            .upsert(enrollRows, { onConflict: 'challenge_id, user_id' })
+        }
+      }
+    }
+
+    // If switching Approval -> Open: resolve leftover pending requests
+    if (targetMode === 'open' && currentMode === 'approval') {
+      try {
+        await supabase
+          .from('challenge_enrollments')
+          .update({
+            status: 'approved',
+            decided_at: new Date().toISOString(),
+            decided_by: user.id,
+          })
+          .eq('challenge_id', challengeId)
+          .eq('status', 'pending')
+      } catch {
+        // Ignore if none
+      }
+    }
+
+    const updatePayload: {
+      name: string
+      duration_days: number
+      start_date: string
+      timezone: string
+      enrollment_mode?: EnrollmentMode
+    } = {
+      name,
+      duration_days: durationDays,
+      start_date: startDate,
+      timezone,
+      ...(params.enrollmentMode ? { enrollment_mode: params.enrollmentMode } : {}),
+    }
+
     const { error: updErr } = await supabase
       .from('challenges')
-      .update({
-        name,
-        duration_days: durationDays,
-        start_date: startDate,
-        timezone,
-      })
+      .update(updatePayload)
       .eq('id', challengeId)
 
     if (updErr) {
@@ -421,6 +531,8 @@ export async function updateChallenge(
     revalidatePath('/dashboard')
     revalidatePath('/dashboard/progress')
     revalidatePath('/leaderboard')
+    revalidatePath('/hub')
+    revalidatePath('/challenges')
 
     return { success: true }
   } catch (err) {
@@ -431,6 +543,478 @@ export async function updateChallenge(
     }
   }
 }
+
+/**
+ * Get count of members who would be grandfathered in if an open challenge is switched to approval.
+ */
+export async function getGrandfatheredParticipantsCount(
+  challengeId: string
+): Promise<{ count: number; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+    const { data: cDays } = await supabase
+      .from('challenge_days')
+      .select('id, activities(id)')
+      .eq('challenge_id', challengeId)
+
+    if (!cDays || cDays.length === 0) return { count: 0 }
+
+    const actIds: string[] = []
+    for (const d of cDays) {
+      for (const a of ((d.activities as { id: string }[]) ?? [])) {
+        actIds.push(a.id)
+      }
+    }
+
+    if (actIds.length === 0) return { count: 0 }
+
+    const { data: compRows } = await supabase
+      .from('activity_completions')
+      .select('user_id')
+      .in('activity_id', actIds)
+
+    if (!compRows || compRows.length === 0) return { count: 0 }
+
+    const uniqueUsers = new Set(compRows.map((r) => r.user_id))
+    return { count: uniqueUsers.size }
+  } catch (err) {
+    return { count: 0, error: err instanceof Error ? err.message : 'Failed to get count' }
+  }
+}
+
+/**
+ * Fetch all join requests and enrolled members for a specific challenge.
+ */
+export async function getChallengeEnrollments(challengeId: string): Promise<{
+  success: boolean
+  pending: ChallengeEnrollmentWithUser[]
+  enrolled: ChallengeEnrollmentWithUser[]
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+    const { data: rows, error } = await supabase
+      .from('challenge_enrollments')
+      .select('*, profiles:user_id(id, full_name, email, avatar_url, display_tag, fellowship_unit)')
+      .eq('challenge_id', challengeId)
+      .order('requested_at', { ascending: false })
+
+    if (error) {
+      return { success: false, pending: [], enrolled: [], error: error.message }
+    }
+
+    const typedRows = (rows ?? []) as unknown as ChallengeEnrollmentWithUser[]
+    const pending = typedRows.filter((r) => r.status === 'pending')
+    const enrolled = typedRows.filter((r) => r.status === 'approved')
+
+    return { success: true, pending, enrolled }
+  } catch (err) {
+    return {
+      success: false,
+      pending: [],
+      enrolled: [],
+      error: err instanceof Error ? err.message : 'Failed to fetch enrollments',
+    }
+  }
+}
+
+/**
+ * Decide a single challenge enrollment request (approve or reject).
+ */
+export async function decideChallengeEnrollment(params: {
+  enrollmentId: string
+  status: 'approved' | 'rejected'
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase, user } = await assertAdmin()
+    const { error } = await supabase
+      .from('challenge_enrollments')
+      .update({
+        status: params.status,
+        decided_at: new Date().toISOString(),
+        decided_by: user.id,
+      })
+      .eq('id', params.enrollmentId)
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/admin')
+    revalidatePath('/hub')
+    revalidatePath('/challenges')
+    revalidatePath('/dashboard')
+    revalidatePath('/leaderboard')
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update enrollment',
+    }
+  }
+}
+
+/**
+ * Decide all pending enrollment requests for a challenge (one-tap Approve All).
+ */
+export async function decideAllPendingEnrollments(params: {
+  challengeId: string
+  status: 'approved' | 'rejected'
+}): Promise<{ success: boolean; count?: number; error?: string }> {
+  try {
+    const { supabase, user } = await assertAdmin()
+    const { data, error } = await supabase
+      .from('challenge_enrollments')
+      .update({
+        status: params.status,
+        decided_at: new Date().toISOString(),
+        decided_by: user.id,
+      })
+      .eq('challenge_id', params.challengeId)
+      .eq('status', 'pending')
+      .select('id')
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/admin')
+    revalidatePath('/hub')
+    revalidatePath('/challenges')
+    revalidatePath('/dashboard')
+    revalidatePath('/leaderboard')
+    return { success: true, count: data?.length ?? 0 }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to decide enrollments',
+    }
+  }
+}
+
+/**
+ * Remove an enrolled member from a challenge (set back to rejected).
+ */
+export async function removeEnrolledMember(params: {
+  enrollmentId: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase, user } = await assertAdmin()
+    const { error } = await supabase
+      .from('challenge_enrollments')
+      .update({
+        status: 'rejected',
+        decided_at: new Date().toISOString(),
+        decided_by: user.id,
+      })
+      .eq('id', params.enrollmentId)
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/admin')
+    revalidatePath('/hub')
+    revalidatePath('/challenges')
+    revalidatePath('/dashboard')
+    revalidatePath('/leaderboard')
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to remove member from challenge',
+    }
+  }
+}
+
+/**
+ * Fetch exact summary of items that will be permanently destroyed when deleting a challenge.
+ */
+export async function getChallengeDeleteSummary(challengeId: string): Promise<{
+  success: boolean
+  summary?: ChallengeDeleteSummary
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // Try RPC first
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('get_challenge_delete_summary', {
+      target_challenge_id: challengeId,
+    })
+
+    if (!rpcErr && rpcData) {
+      return { success: true, summary: rpcData as unknown as ChallengeDeleteSummary }
+    }
+
+    // Fallback: direct calculation
+    const { data: challenge, error: chalErr } = await supabase
+      .from('challenges')
+      .select('*')
+      .eq('id', challengeId)
+      .single()
+
+    if (chalErr || !challenge) {
+      return { success: false, error: 'Challenge not found' }
+    }
+
+    const { data: cDays } = await supabase
+      .from('challenge_days')
+      .select('id, activities(id)')
+      .eq('challenge_id', challengeId)
+
+    const dayIds = (cDays ?? []).map((d) => d.id)
+    const actIds: string[] = []
+    for (const d of cDays ?? []) {
+      for (const a of ((d.activities as { id: string }[]) ?? [])) {
+        actIds.push(a.id)
+      }
+    }
+
+    let completionsCount = 0
+    let actCompsCount = 0
+    let distinctParticipants = 0
+
+    if (dayIds.length > 0) {
+      const { count: cCount } = await supabase
+        .from('completions')
+        .select('*', { count: 'exact', head: true })
+        .in('challenge_day_id', dayIds)
+      completionsCount = cCount ?? 0
+    }
+
+    if (actIds.length > 0) {
+      const { count: acCount } = await supabase
+        .from('activity_completions')
+        .select('*', { count: 'exact', head: true })
+        .in('activity_id', actIds)
+      actCompsCount = acCount ?? 0
+
+      const { data: compRows } = await supabase
+        .from('activity_completions')
+        .select('user_id')
+        .in('activity_id', actIds)
+
+      if (compRows) {
+        distinctParticipants = new Set(compRows.map((r) => r.user_id)).size
+      }
+    }
+
+    let journalCount = 0
+    if (dayIds.length > 0) {
+      const { count: jCount } = await supabase
+        .from('journal_entries')
+        .select('*', { count: 'exact', head: true })
+        .in('challenge_day_id', dayIds)
+      journalCount = jCount ?? 0
+    }
+
+    const { count: enrollCount } = await supabase
+      .from('challenge_enrollments')
+      .select('*', { count: 'exact', head: true })
+      .eq('challenge_id', challengeId)
+
+    const tz = challenge.timezone || 'Africa/Lagos'
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+    const endStr = new Date(
+      new Date(challenge.start_date + 'T00:00:00Z').getTime() + (challenge.duration_days - 1) * 86400000
+    )
+      .toISOString()
+      .split('T')[0]
+
+    const status: ChallengeStatus =
+      todayStr < challenge.start_date ? 'upcoming' : todayStr > endStr ? 'completed' : 'active'
+
+    const summary: ChallengeDeleteSummary = {
+      id: challenge.id,
+      name: challenge.name,
+      status,
+      days_count: dayIds.length,
+      activities_count: actIds.length,
+      participants_count: distinctParticipants,
+      completions_count: completionsCount + actCompsCount,
+      activity_completions_count: actCompsCount,
+      journal_entries_count: journalCount,
+      enrollments_count: enrollCount ?? 0,
+    }
+
+    return { success: true, summary }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to get delete summary',
+    }
+  }
+}
+
+/**
+ * Permanently delete a challenge with atomic cascading through all child tables.
+ * Requires typing exact challenge title.
+ */
+export async function deleteChallenge(
+  challengeId: string,
+  confirmedName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // 1. Verify exact name match
+    const { data: challenge, error: fetchErr } = await supabase
+      .from('challenges')
+      .select('id, name')
+      .eq('id', challengeId)
+      .single()
+
+    if (fetchErr || !challenge) {
+      return { success: false, error: 'Challenge not found in system.' }
+    }
+
+    if (challenge.name.trim() !== confirmedName.trim()) {
+      return {
+        success: false,
+        error: `Confirmation title does not match. Expected "${challenge.name.trim()}".`,
+      }
+    }
+
+    // 2. Try atomic RPC delete first
+    const { error: rpcErr } = await supabase.rpc('delete_challenge', {
+      target_challenge_id: challengeId,
+      confirmed_name: confirmedName.trim(),
+    })
+
+    if (rpcErr) {
+      console.warn('[deleteChallenge] RPC delete failed or not defined, trying direct cascade delete:', rpcErr.message)
+      const { error: delErr } = await supabase
+        .from('challenges')
+        .delete()
+        .eq('id', challengeId)
+
+      if (delErr) {
+        return { success: false, error: `Deletion failed: ${delErr.message}` }
+      }
+    }
+
+    // 3. Clear selected challenge session cookie if it pointed to this challenge
+    try {
+      const cookieStore = await cookies()
+      if (cookieStore.get(SELECTED_CHALLENGE_COOKIE)?.value === challengeId) {
+        cookieStore.delete(SELECTED_CHALLENGE_COOKIE)
+      }
+    } catch {
+      // Ignore cookie errors
+    }
+
+    revalidatePath('/admin')
+    revalidatePath('/admin/analytics')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/progress')
+    revalidatePath('/leaderboard')
+    revalidatePath('/hub')
+    revalidatePath('/challenges')
+
+    return { success: true }
+  } catch (err) {
+    console.error('[deleteChallenge] Unexpected error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'An unexpected error occurred while deleting challenge.',
+    }
+  }
+}
+
+/**
+ * Export results CSV for a challenge before deletion or for administrative archival.
+ */
+export async function getChallengeExportCsv(challengeId: string): Promise<{
+  success: boolean
+  csv?: string
+  filename?: string
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    const { data: challenge } = await supabase
+      .from('challenges')
+      .select('*')
+      .eq('id', challengeId)
+      .single()
+
+    if (!challenge) return { success: false, error: 'Challenge not found' }
+
+    const [daysRes, membersRes, actCompsRes, compsRes] = await Promise.all([
+      supabase
+        .from('challenge_days')
+        .select('id, day_number, title, scripture_reference, activities(id, description)')
+        .eq('challenge_id', challengeId)
+        .order('day_number', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'member')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('activity_completions')
+        .select('id, user_id, activity_id, completed_at'),
+      supabase
+        .from('completions')
+        .select('id, user_id, challenge_day_id, completed_at'),
+    ])
+
+    const days = daysRes.data ?? []
+    const members = membersRes.data ?? []
+    const actComps = actCompsRes.data ?? []
+    const comps = compsRes.data ?? []
+
+    const validDayIds = new Set(days.map((d) => d.id))
+    const validActIds = new Set(
+      days.flatMap((d) => (d.activities as { id: string }[] ?? []).map((a) => a.id))
+    )
+
+    const challengeActComps = actComps.filter((ac) => validActIds.has(ac.activity_id))
+    const challengeComps = comps.filter((c) => validDayIds.has(c.challenge_day_id))
+
+    function escapeCsv(val: unknown): string {
+      if (val === null || val === undefined) return '""'
+      return `"${String(val).replace(/"/g, '""')}"`
+    }
+
+    const headers = [
+      'Member Name',
+      'Email',
+      'Fellowship Unit',
+      'Challenge Name',
+      'Total Activities Completed',
+      'Total Full Days Completed',
+      'Last Completed Date',
+    ]
+
+    const rows = members.map((m) => {
+      const userActs = challengeActComps.filter((ac) => ac.user_id === m.id)
+      const userDays = challengeComps.filter((c) => c.user_id === m.id)
+      const lastAct = userActs.sort(
+        (a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+      )[0]
+
+      return [
+        escapeCsv(m.full_name),
+        escapeCsv(m.email),
+        escapeCsv(m.fellowship_unit || 'General Assembly'),
+        escapeCsv(challenge.name),
+        userActs.length,
+        userDays.length,
+        escapeCsv(lastAct?.completed_at ? new Date(lastAct.completed_at).toISOString().split('T')[0] : 'N/A'),
+      ].join(',')
+    })
+
+    const csvContent = [headers.join(','), ...rows].join('\r\n')
+    const safeTitle = challenge.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase()
+    const stamp = new Date().toISOString().split('T')[0]
+    const filename = `bbcc_${safeTitle}_results_${stamp}.csv`
+
+    return { success: true, csv: csvContent, filename }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to export challenge CSV',
+    }
+  }
+}
+
 
 /**
  * Update challenge start date and timezone (legacy / backwards compatibility).

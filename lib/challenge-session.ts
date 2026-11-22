@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import type { Challenge, ChallengeStatus } from '@/lib/types'
+import type { Challenge, ChallengeStatus, EnrollmentMode } from '@/lib/types'
 
 export const SELECTED_CHALLENGE_COOKIE = 'bbcc_selected_challenge_id'
 
@@ -14,6 +14,8 @@ export interface ResolvedChallengeContext {
   timezone: string
   status: ChallengeStatus
   currentDay: number
+  enrollmentMode: EnrollmentMode
+  canAccess: boolean
 }
 
 /**
@@ -71,6 +73,8 @@ export async function getEffectiveChallenge(
       timezone,
       status: currentDay > durationDays ? 'completed' : currentDay === 0 ? 'upcoming' : 'active',
       currentDay,
+      enrollmentMode: 'open',
+      canAccess: true,
     }
   }
 
@@ -136,12 +140,47 @@ export async function getEffectiveChallenge(
       timezone: 'Africa/Lagos',
       status: 'active',
       currentDay: 1,
+      enrollmentMode: 'open',
+      canAccess: true,
     }
   }
 
   const durationDays = selected.duration_days
   const challengeName = selected.name
   const challengeTitle = `${durationDays} Days of ${challengeName}`
+  const enrollmentMode: EnrollmentMode = (selected.enrollment_mode as EnrollmentMode) || 'open'
+
+  let canAccess = true
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'admin'
+    const isApprovedAccount = profile?.status === 'approved'
+
+    if (!isAdmin) {
+      if (!isApprovedAccount) {
+        canAccess = false
+      } else if (enrollmentMode === 'approval') {
+        const { data: enr } = await supabase
+          .from('challenge_enrollments')
+          .select('status')
+          .eq('challenge_id', selected.id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        canAccess = enr?.status === 'approved'
+      }
+    }
+  } else {
+    canAccess = false
+  }
 
   return {
     targetChallenge: selected,
@@ -153,5 +192,7 @@ export async function getEffectiveChallenge(
     timezone: selected.timezone,
     status: selected.status,
     currentDay: selected.currentDay,
+    enrollmentMode,
+    canAccess,
   }
 }

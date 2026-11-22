@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { SELECTED_CHALLENGE_COOKIE } from '@/lib/challenge-session'
-import type { ChallengeStatus } from '@/lib/types'
+import type { ChallengeStatus, EnrollmentMode, EnrollmentStatus } from '@/lib/types'
 
 export interface HubChallengeItem {
   id: string
@@ -14,6 +14,9 @@ export interface HubChallengeItem {
   timezone: string
   status: ChallengeStatus
   current_day: number
+  enrollment_mode: EnrollmentMode
+  user_enrollment_status: 'none' | 'pending' | 'approved' | 'rejected'
+  can_access: boolean
   // Member's stats
   participated: boolean
   user_total_activities: number
@@ -61,7 +64,16 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
     throw new Error('Unauthenticated')
   }
 
-  // 1. Fetch all challenges from public.challenges (or challenges_with_status)
+  // 1. Fetch member profile and enrollments
+  const [profileRes, enrollmentsRes] = await Promise.all([
+    supabase.from('profiles').select('id, role, status').eq('id', user.id).single(),
+    supabase.from('challenge_enrollments').select('challenge_id, status').eq('user_id', user.id),
+  ])
+
+  const profile = profileRes.data
+  const userEnrollments = enrollmentsRes.data ?? []
+
+  // 2. Fetch all challenges from public.challenges (or challenges_with_status)
   let { data: challenges, error } = await supabase
     .from('challenges')
     .select('*')
@@ -118,6 +130,9 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
       timezone,
       status: isCompleted ? 'completed' : currentDay === 0 ? 'upcoming' : 'active',
       current_day: currentDay,
+      enrollment_mode: 'open',
+      user_enrollment_status: 'approved',
+      can_access: true,
       participated: (actCount ?? 0) > 0,
       user_total_activities: actCount ?? 0,
       user_completed_days: stats.total_completed,
@@ -138,7 +153,7 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
     }
   }
 
-  // 2. Process each challenge and gather stats
+  // 3. Process each challenge and gather stats
   const now = new Date()
 
   const items: HubChallengeItem[] = await Promise.all(
@@ -167,8 +182,21 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         currentDay = diffDays + 1
       }
 
-      // If upcoming, RLS blocks days and member has no activities yet
-      if (status === 'upcoming') {
+      const enrollmentMode: EnrollmentMode = (c.enrollment_mode as EnrollmentMode) || 'open'
+      const userEnrollment = userEnrollments.find((e) => e.challenge_id === c.id)
+      const userEnrollmentStatus: 'none' | 'pending' | 'approved' | 'rejected' = userEnrollment
+        ? (userEnrollment.status as 'pending' | 'approved' | 'rejected')
+        : 'none'
+
+      const isAdmin = profile?.role === 'admin'
+      const isApprovedAccount = profile?.status === 'approved'
+      const canAccess =
+        isAdmin ||
+        (isApprovedAccount &&
+          (enrollmentMode === 'open' || userEnrollmentStatus === 'approved'))
+
+      // If user cannot access this challenge, return basic info only with zero stats
+      if (!canAccess) {
         return {
           id: c.id,
           name: c.name,
@@ -177,7 +205,10 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
           end_date: endStr,
           timezone: tz,
           status,
-          current_day: 0,
+          current_day: currentDay,
+          enrollment_mode: enrollmentMode,
+          user_enrollment_status: userEnrollmentStatus,
+          can_access: false,
           participated: false,
           user_total_activities: 0,
           user_completed_days: 0,
@@ -189,7 +220,32 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         }
       }
 
-      // For active or completed challenges, fetch member's stats scoped to this challenge
+      // If upcoming, RLS blocks days and member has no activities yet
+      if (status === 'upcoming') {
+        return {
+          id: c.id,
+          name: c.name,
+          duration_days: c.duration_days,
+          start_date: c.start_date,
+          end_date: endStr,
+          timezone: tz,
+          status,
+          current_day: 0,
+          enrollment_mode: enrollmentMode,
+          user_enrollment_status: userEnrollmentStatus,
+          can_access: true,
+          participated: false,
+          user_total_activities: 0,
+          user_completed_days: 0,
+          user_streak: 0,
+          user_longest_run: 0,
+          user_rank: null,
+          total_participants: 0,
+          progress_pct: 0,
+        }
+      }
+
+      // For active or completed challenges with access, fetch member's stats scoped to this challenge
       const [statsRes, actCompRes, leaderboardRes] = await Promise.all([
         supabase.rpc('get_member_stats', { member_id: user.id, target_challenge_id: c.id }),
         supabase
@@ -227,6 +283,9 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         timezone: tz,
         status,
         current_day: currentDay,
+        enrollment_mode: enrollmentMode,
+        user_enrollment_status: userEnrollmentStatus,
+        can_access: true,
         participated: userActCount > 0,
         user_total_activities: userActCount,
         user_completed_days: stats.total_completed,
@@ -260,3 +319,108 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
     nextUpcomingChallengeName: nextUpcoming?.name ?? null,
   }
 }
+
+/**
+ * Request to join an approval-mode challenge.
+ * Status is forced to 'pending', user_id = auth.uid().
+ * Only allowed for non-completed approval challenges where no enrollment row exists.
+ */
+export async function requestChallengeEnrollment(challengeId: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: 'Unauthenticated: please log in.' }
+    }
+
+    // 1. Verify user profile status
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.status !== 'approved') {
+      return {
+        success: false,
+        error: 'Your church member account must be approved before requesting challenge entry.',
+      }
+    }
+
+    // 2. Fetch challenge
+    const { data: challenge } = await supabase
+      .from('challenges')
+      .select('id, name, start_date, duration_days, timezone, enrollment_mode')
+      .eq('id', challengeId)
+      .single()
+
+    if (!challenge) {
+      return { success: false, error: 'Challenge not found' }
+    }
+
+    if (challenge.enrollment_mode !== 'approval') {
+      return { success: false, error: 'This challenge has open enrollment; no request is needed.' }
+    }
+
+    const tz = challenge.timezone || 'Africa/Lagos'
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+    const endStr = new Date(
+      new Date(challenge.start_date + 'T00:00:00Z').getTime() + (challenge.duration_days - 1) * 86400000
+    )
+      .toISOString()
+      .split('T')[0]
+
+    if (todayStr > endStr) {
+      return { success: false, error: 'This challenge is already completed. Join requests are closed.' }
+    }
+
+    // 3. Check existing enrollment row
+    const { data: existing } = await supabase
+      .from('challenge_enrollments')
+      .select('id, status')
+      .eq('challenge_id', challengeId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (existing) {
+      if (existing.status === 'pending') {
+        return { success: true } // Already requested
+      }
+      if (existing.status === 'approved') {
+        return { success: true } // Already approved
+      }
+      if (existing.status === 'rejected') {
+        return {
+          success: false,
+          error: 'Not enrolled in this challenge. Please reach out to church admin.',
+        }
+      }
+    }
+
+    // 4. Insert pending enrollment row
+    const { error: insErr } = await supabase.from('challenge_enrollments').insert({
+      challenge_id: challengeId,
+      user_id: user.id,
+      status: 'pending',
+      requested_at: new Date().toISOString(),
+    })
+
+    if (insErr) {
+      return { success: false, error: insErr.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to submit join request',
+    }
+  }
+}
+

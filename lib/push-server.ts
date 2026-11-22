@@ -278,13 +278,22 @@ export async function checkAndDispatchNewDayPush(options?: { force?: boolean }):
       .update({ last_notified_challenge_day: currentDay })
       .eq('id', 1)
 
-    // 4. Query all approved members
-    const { data: approvedMembers } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('status', 'approved')
-
-    const memberIds = approvedMembers ? approvedMembers.map((m) => m.id) : []
+    // 4. Query eligible members who can access this active challenge
+    let memberIds: string[] = []
+    if (activeChallenge.enrollment_mode === 'approval') {
+      const { data: enrolledRows } = await supabase
+        .from('challenge_enrollments')
+        .select('user_id')
+        .eq('challenge_id', activeChallenge.id)
+        .eq('status', 'approved')
+      memberIds = enrolledRows ? enrolledRows.map((e) => e.user_id) : []
+    } else {
+      const { data: approvedMembers } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('status', 'approved')
+      memberIds = approvedMembers ? approvedMembers.map((m) => m.id) : []
+    }
 
     // 5. Dispatch push
     const dispatchResult = await sendPushToUsers(memberIds, 'new_day', {

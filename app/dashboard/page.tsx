@@ -224,6 +224,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
+  // ── Handle Edge Case: Non-enrolled in Approval Challenge ───────
+  if (!isAdmin && !challengeCtx.canAccess) {
+    redirect('/hub')
+  }
+
   // ── Handle Edge Case: Upcoming Challenge ───────────────────
   if (challengeStatus === 'upcoming') {
     return (
