@@ -41,7 +41,9 @@ export async function updateSession(request: NextRequest) {
   const isProtectedMember =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/community') ||
-    pathname.startsWith('/leaderboard')
+    pathname.startsWith('/leaderboard') ||
+    pathname.startsWith('/hub') ||
+    pathname.startsWith('/challenges')
   const isProtectedAdmin = pathname.startsWith('/admin')
   const isHoldingRoute = pathname.startsWith('/pending')
   const isAuthRoute =
@@ -85,21 +87,21 @@ export async function updateSession(request: NextRequest) {
     // If they hit /pending holding page, redirect to their home
     if (isHoldingRoute) {
       const url = request.nextUrl.clone()
-      url.pathname = isAdmin ? '/admin' : '/dashboard'
+      url.pathname = isAdmin ? '/admin' : '/hub'
       return NextResponse.redirect(url)
     }
 
     // If they hit an auth route (login/signup) → redirect to their home
     if (isAuthRoute) {
       const url = request.nextUrl.clone()
-      url.pathname = isAdmin ? '/admin' : '/dashboard'
+      url.pathname = isAdmin ? '/admin' : '/hub'
       return NextResponse.redirect(url)
     }
 
-    // Admin-only area accessed by a non-admin → redirect to dashboard
+    // Admin-only area accessed by a non-admin → redirect to hub
     if (isProtectedAdmin && !isAdmin) {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      url.pathname = '/hub'
       return NextResponse.redirect(url)
     }
   }

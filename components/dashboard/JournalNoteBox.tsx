@@ -10,6 +10,7 @@ interface JournalNoteBoxProps {
   currentDay: number
   initialContent?: string
   isPastoralPreview?: boolean
+  isReadOnly?: boolean
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
@@ -20,13 +21,14 @@ export default function JournalNoteBox({
   currentDay,
   initialContent = '',
   isPastoralPreview = false,
+  isReadOnly = false,
 }: JournalNoteBoxProps) {
   const [content, setContent] = useState<string>(initialContent)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Future day locked check: if currentDay is set and dayNumber > currentDay
-  const isFutureDay = currentDay > 0 && dayNumber > currentDay
+  // Future day locked check: if currentDay is set and dayNumber > currentDay (only when not read-only archive)
+  const isFutureDay = !isReadOnly && currentDay > 0 && dayNumber > currentDay
 
   // Keep track of the active day and latest content via refs to prevent stale closures
   const activeDayIdRef = useRef<string>(dayId)
@@ -40,7 +42,7 @@ export default function JournalNoteBox({
 
   // ── Core Save Executor ─────────────────────────────────────
   const executeSave = useCallback(async (targetDayId: string, textToSave: string) => {
-    if (!targetDayId || isPastoralPreview || isFutureDay) return
+    if (!targetDayId || isPastoralPreview || isFutureDay || isReadOnly) return
     if (textToSave === lastSavedContentRef.current) {
       setSaveStatus('saved')
       return
@@ -67,7 +69,7 @@ export default function JournalNoteBox({
     } finally {
       isSavingRef.current = false
     }
-  }, [isPastoralPreview, isFutureDay])
+  }, [isPastoralPreview, isFutureDay, isReadOnly])
 
   // ── Flush Pending Save ─────────────────────────────────────
   const flushPendingSave = useCallback(() => {
@@ -171,6 +173,42 @@ export default function JournalNoteBox({
           </span>
           Member spiritual reflections and journal notes are strictly private between the believer and the Lord. They cannot be viewed in preview mode.
         </div>
+      </div>
+    )
+  }
+
+  // Read-only archival view for completed challenges
+  if (isReadOnly) {
+    return (
+      <div className="mt-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-xs font-semibold text-[var(--text-ink)] flex items-center gap-1.5">
+            <BookOpen size={13} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
+            <span>Spiritual Reflection</span>
+            <span className="text-[10px] font-normal text-[var(--text-muted)]">
+              (Day {dayNumber})
+            </span>
+          </div>
+          <span className="text-[10px] font-semibold text-[var(--text-muted)] bg-[var(--bg-subtle)] px-2 py-0.5 rounded-full border border-[var(--border-subtle)]">
+            Preserved · Read-Only
+          </span>
+        </div>
+
+        {content.trim() ? (
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-4 shadow-2xs">
+            <p className="text-xs text-[var(--text-ink)] leading-relaxed whitespace-pre-wrap font-serif italic">
+              &ldquo;{content}&rdquo;
+            </p>
+            <div className="mt-2.5 pt-2 border-t border-[var(--border-hairline)] flex items-center justify-between text-[10px] text-[var(--text-muted)]">
+              <span>Archived entry</span>
+              <span>{content.length} characters</span>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-3.5 text-center text-xs text-[var(--text-muted)] italic">
+            No journal reflections were recorded for Day {dayNumber}.
+          </div>
+        )}
       </div>
     )
   }

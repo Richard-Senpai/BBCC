@@ -41,6 +41,27 @@ export async function saveJournalEntry(
       return { success: false, error: 'Missing challenge day reference.' }
     }
 
+    // ── Guardrail: ensure challenge is active ───────────────────
+    const { data: dayRow } = await supabase
+      .from('challenge_days')
+      .select('id, challenge_id')
+      .eq('id', challengeDayId)
+      .single()
+
+    if (!dayRow) {
+      return { success: false, error: 'Challenge day not found.' }
+    }
+
+    if (dayRow.challenge_id) {
+      const { data: statusRes } = await supabase.rpc('get_challenge_status', { c_id: dayRow.challenge_id })
+      if (statusRes !== 'active') {
+        return {
+          success: false,
+          error: 'This challenge has concluded. Journal entries are preserved as read-only reflections.',
+        }
+      }
+    }
+
     const cleanContent = typeof content === 'string' ? content.trim() : ''
     const now = new Date().toISOString()
 
@@ -125,8 +146,11 @@ export async function getJournalEntry(
 /**
  * Fetch all journal reflections for the current authenticated member.
  * Only returns days where a note was actually written.
+ * Can be optionally scoped to a target challenge.
  */
-export async function getUserJournalEntries(): Promise<GetUserJournalsResponse> {
+export async function getUserJournalEntries(
+  targetChallengeId?: string
+): Promise<GetUserJournalsResponse> {
   try {
     const supabase = await createClient()
 
@@ -139,14 +163,19 @@ export async function getUserJournalEntries(): Promise<GetUserJournalsResponse> 
       return { success: false, error: 'Unauthorized', entries: [] }
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('journal_entries')
       .select(
-        'id, user_id, challenge_day_id, content, created_at, updated_at, challenge_days!inner(id, day_number, title, scripture_reference)'
+        'id, user_id, challenge_day_id, content, created_at, updated_at, challenge_days!inner(id, day_number, title, scripture_reference, challenge_id)'
       )
       .eq('user_id', user.id)
       .neq('content', '')
-      .order('updated_at', { ascending: false })
+
+    if (targetChallengeId) {
+      query = query.eq('challenge_days.challenge_id', targetChallengeId)
+    }
+
+    const { data, error } = await query.order('updated_at', { ascending: false })
 
     if (error) {
       console.error('[getUserJournalEntries] Database error:', error)

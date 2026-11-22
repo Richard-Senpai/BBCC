@@ -1,40 +1,36 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Flame, TrendingUp, CheckCheck, Award, Lock } from 'lucide-react'
+import { Flame, TrendingUp, CheckCheck, Award, Lock, Layers } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
 import AnnouncementBell from '@/components/AnnouncementBell'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
 import MyJournalSection from '@/components/dashboard/MyJournalSection'
+import { getEffectiveChallenge } from '@/lib/challenge-session'
 import type { MemberStats, Profile } from '@/lib/types'
 
-export default async function ProgressPage() {
+interface ProgressPageProps {
+  searchParams?: Promise<{
+    challenge?: string
+  }>
+}
+
+export default async function ProgressPage({ searchParams }: ProgressPageProps) {
   const supabase = await createClient()
+  const resolvedParams = searchParams ? await searchParams : {}
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, settingsRes, challengesRes] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single(),
-      supabase
-        .from('challenge_settings')
-        .select('*')
-        .eq('id', 1)
-        .single(),
-      supabase
-        .from('challenges')
-        .select('*')
-        .order('start_date', { ascending: false }),
-    ])
+  const { data: profile } = (await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()) as { data: Profile | null; error: unknown }
 
-  const profile = profileRes.data as Profile | null
   if (!profile) redirect('/login')
 
   const isAdmin = profile.role === 'admin'
@@ -42,35 +38,19 @@ export default async function ProgressPage() {
     redirect('/pending')
   }
 
-  const settings = settingsRes.data
-  const allChallenges = challengesRes.data ?? []
+  // Resolve active or selected challenge
+  const challengeCtx = await getEffectiveChallenge(resolvedParams.challenge)
+  const {
+    targetChallengeId,
+    durationDays,
+    challengeName,
+    status: challengeStatus,
+    currentDay,
+  } = challengeCtx
 
-  // Resolve active challenge or most recent completed
-  const tz = allChallenges[0]?.timezone || settings?.timezone || 'Africa/Lagos'
-  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+  const isCompletedChallenge = challengeStatus === 'completed'
 
-  let targetChallenge = null
-  for (const c of allChallenges) {
-    const sDate = c.start_date
-    const eDate = new Date(new Date(sDate + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000).toISOString().split('T')[0]
-    if (todayStr >= sDate && todayStr <= eDate) {
-      targetChallenge = c
-      break
-    }
-  }
-
-  if (!targetChallenge && allChallenges.length > 0) {
-    targetChallenge = allChallenges[0]
-  }
-
-  const targetChallengeId = targetChallenge?.id
-  const durationDays = targetChallenge?.duration_days ?? settings?.duration_days ?? 40
-  const challengeName = targetChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
-
-  const [currentDayRes, statsRes, completedDaysRes] = await Promise.all([
-    targetChallengeId
-      ? supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
-      : supabase.rpc('get_current_challenge_day'),
+  const [statsRes, completedDaysRes] = await Promise.all([
     targetChallengeId
       ? supabase.rpc('get_member_stats', { member_id: user.id, target_challenge_id: targetChallengeId })
       : supabase.rpc('get_member_stats', { member_id: user.id }),
@@ -95,7 +75,6 @@ export default async function ProgressPage() {
     unreadCount = count ?? 0
   }
 
-  const currentDay = (currentDayRes.data as number) ?? 0
   const stats: MemberStats = (statsRes.data as MemberStats[] | null)?.[0] ?? {
     current_streak: 0,
     longest_run: 0,
@@ -135,11 +114,20 @@ export default async function ProgressPage() {
             </h1>
             <p className="text-[11px] text-[var(--text-muted)]">
               {profile.full_name} / {durationDays} Days of {challengeName}
+              {isCompletedChallenge ? ' (Archive)' : ''}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/hub"
+            title="Switch Challenge Hub"
+            className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-2.5 py-1 rounded-full transition shadow-2xs"
+          >
+            <Layers size={12} className="text-[var(--flame-accent)]" />
+            <span>Hub</span>
+          </Link>
           <AnnouncementBell unreadCount={unreadCount} />
           <ThemeToggle />
         </div>
@@ -207,7 +195,9 @@ export default async function ProgressPage() {
           <div className="flex justify-between mt-2 text-[10px] text-[var(--text-muted)]">
             <span>Day 1</span>
             <span>
-              {currentDay > 0 && currentDay <= durationDays
+              {isCompletedChallenge
+                ? `Completed ${durationDays}-Day Course`
+                : currentDay > 0 && currentDay <= durationDays
                 ? `Day ${currentDay} of ${durationDays}`
                 : `Day ${durationDays}`}
             </span>
@@ -243,12 +233,14 @@ export default async function ProgressPage() {
           totalCompleted={stats.total_completed}
           durationDays={durationDays}
           challengeName={challengeName}
+          challengeId={targetChallengeId}
+          isCompletedChallenge={isCompletedChallenge}
         />
       </section>
 
       {/* My Spiritual Journal Section */}
       <section className="px-4">
-        <MyJournalSection />
+        <MyJournalSection targetChallengeId={targetChallengeId ?? undefined} />
       </section>
 
       {/* Certificate preview */}

@@ -31,5 +31,5 @@ export default async function HomePage() {
     redirect('/pending')
   }
 
-  redirect('/dashboard')
+  redirect('/hub')
 }

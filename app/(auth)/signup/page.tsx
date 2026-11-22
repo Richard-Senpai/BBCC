@@ -117,7 +117,7 @@ export default function SignupPage() {
       } else if (profile?.status === 'pending' || profile?.status === 'rejected') {
         router.push('/pending')
       } else {
-        router.push('/dashboard')
+        router.push('/hub')
       }
       router.refresh()
     } else {
@@ -160,7 +160,7 @@ export default function SignupPage() {
       } else if (profile?.status === 'pending' || profile?.status === 'rejected') {
         router.push('/pending')
       } else {
-        router.push('/dashboard')
+        router.push('/hub')
       }
       router.refresh()
     }

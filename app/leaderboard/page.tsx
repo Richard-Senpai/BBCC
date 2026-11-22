@@ -1,57 +1,44 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Flame, Crown, Shield, Award, BookOpen, Lock, AlertTriangle } from 'lucide-react'
+import { Flame, Crown, Shield, Award, BookOpen, Lock, AlertTriangle, Layers } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import UserAvatar from '@/components/UserAvatar'
 import ThemeToggle from '@/components/ThemeToggle'
 import AnnouncementBell from '@/components/AnnouncementBell'
+import { getEffectiveChallenge } from '@/lib/challenge-session'
 import type { LeaderboardEntry, Profile, MemberStats } from '@/lib/types'
 
-export default async function LeaderboardPage() {
+interface LeaderboardPageProps {
+  searchParams?: Promise<{
+    challenge?: string
+  }>
+}
+
+export default async function LeaderboardPage({ searchParams }: LeaderboardPageProps) {
   const supabase = await createClient()
+  const resolvedParams = searchParams ? await searchParams : {}
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Fetch settings & challenges to scope leaderboard to active/most recent challenge
-  const [settingsRes, challengesRes] = await Promise.all([
-    supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-    supabase.from('challenges').select('*').order('start_date', { ascending: false }),
-  ])
+  // Resolve active or selected challenge
+  const challengeCtx = await getEffectiveChallenge(resolvedParams.challenge)
+  const {
+    targetChallengeId,
+    durationDays,
+    challengeName,
+    challengeTitle,
+    status: challengeStatus,
+    currentDay,
+  } = challengeCtx
 
-  const settings = settingsRes.data
-  const allChallenges = challengesRes.data ?? []
+  const isCompletedChallenge = challengeStatus === 'completed'
 
-  // Resolve active challenge or most recent completed
-  const tz = allChallenges[0]?.timezone || settings?.timezone || 'Africa/Lagos'
-  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
-
-  let targetChallenge = null
-  for (const c of allChallenges) {
-    const sDate = c.start_date
-    const eDate = new Date(new Date(sDate + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000).toISOString().split('T')[0]
-    if (todayStr >= sDate && todayStr <= eDate) {
-      targetChallenge = c
-      break
-    }
-  }
-
-  if (!targetChallenge && allChallenges.length > 0) {
-    targetChallenge = allChallenges[0]
-  }
-
-  const targetChallengeId = targetChallenge?.id
-  const durationDays = targetChallenge?.duration_days ?? settings?.duration_days ?? 40
-  const challengeName = targetChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
-
-  // Parallel fetches: current day, leaderboard (top 6 + user rank), and current user profile/stats
-  const [currentDayRes, leaderboardRes, userProfileRes, userStatsRes, userActivitiesRes] =
+  // Parallel fetches: leaderboard (top 6 + user rank), and current user profile/stats
+  const [leaderboardRes, userProfileRes, userStatsRes, userActivitiesRes] =
     await Promise.all([
-      targetChallengeId
-        ? supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
-        : supabase.rpc('get_current_challenge_day'),
       targetChallengeId
         ? supabase.rpc('get_leaderboard', { target_challenge_id: targetChallengeId })
         : supabase.rpc('get_leaderboard'),
@@ -76,7 +63,6 @@ export default async function LeaderboardPage() {
                 .eq('user_id', user.id))
         : Promise.resolve({ count: 0 }),
     ])
-  const currentDay = (currentDayRes.data as number) ?? 0
 
   const leaderboardRaw = leaderboardRes.data as any
   const leaderboardError = leaderboardRes.error ? leaderboardRes.error.message : null
@@ -176,46 +162,83 @@ export default async function LeaderboardPage() {
           <BBCCLogo size="sm" />
           <div className="leading-tight">
             <h1 className="text-sm font-semibold tracking-tight text-[var(--text-ink)]">
-              Fellowship Standings
+              {isCompletedChallenge ? 'Archived Standings' : 'Fellowship Standings'}
             </h1>
             <p className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--olive-accent)] inline-block" />
-              Day {currentDay > 0 ? currentDay : 1} of {durationDays} / Corporate Consecration
+              <span className={`w-1.5 h-1.5 rounded-full inline-block ${isCompletedChallenge ? 'bg-amber-500' : 'bg-[var(--olive-accent)]'}`} />
+              {isCompletedChallenge
+                ? `${durationDays} Days of ${challengeName} · Final Records`
+                : `Day ${currentDay > 0 ? currentDay : 1} of ${durationDays} / Corporate Consecration`}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/hub"
+            title="Switch Challenge Hub"
+            className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-2.5 py-1 rounded-full transition shadow-2xs"
+          >
+            <Layers size={12} className="text-[var(--flame-accent)]" />
+            <span>Hub</span>
+          </Link>
           <ThemeToggle />
           <AnnouncementBell unreadCount={unreadCount} />
         </div>
       </header>
 
-      {/* ── Corporate Milestone Banner ────────────────────────── */}
-      <section className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-4 mt-2">
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1 text-[var(--flame-accent)] text-[11px] font-semibold mb-1">
-              <Flame size={13} strokeWidth={1.75} />
-              Week {currentWeek} Corporate Milestone
-            </span>
-            <h2 className="text-sm font-semibold text-[var(--text-ink)]">
-              Corporate Fast &amp; Prayer
-            </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Daily discipleship and fellowship covenant.
-            </p>
+      {/* ── Challenge Status Banner ────────────────────────────── */}
+      {isCompletedChallenge ? (
+        <section className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 mt-2">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 text-[11px] font-semibold mb-1">
+                <Lock size={13} strokeWidth={2} />
+                Final Fellowship Standings — Frozen Archive
+              </span>
+              <h2 className="text-sm font-semibold text-[var(--text-ink)]">
+                {challengeTitle}
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                This consecration cycle has concluded. Fellowship honor podium and standings are sealed.
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 leading-none">
+                {totalRankedMembers}
+              </span>
+              <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+                Consecrated Disciples
+              </p>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-2xl font-bold text-[var(--flame-accent)] leading-none">
-              94%
-            </span>
-            <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
-              Congregation Active
-            </p>
+        </section>
+      ) : (
+        <section className="bg-[var(--bg-surface)] border border-[var(--border-hairline)] rounded-xl p-4 mt-2">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="inline-flex items-center gap-1 text-[var(--flame-accent)] text-[11px] font-semibold mb-1">
+                <Flame size={13} strokeWidth={1.75} />
+                Week {currentWeek} Corporate Milestone
+              </span>
+              <h2 className="text-sm font-semibold text-[var(--text-ink)]">
+                Corporate Fast &amp; Prayer
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Daily discipleship and fellowship covenant.
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-[var(--flame-accent)] leading-none">
+                94%
+              </span>
+              <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+                Congregation Active
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Filter Pills ──────────────────────────────────────── */}
       <section className="flex bg-[var(--bg-subtle)] rounded-xl p-1 mt-3 text-xs font-medium text-[var(--text-muted)] border border-[var(--border-hairline)]">

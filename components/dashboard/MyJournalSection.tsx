@@ -8,22 +8,23 @@ import type { JournalEntryWithDay } from '@/lib/types'
 
 interface MyJournalSectionProps {
   initialEntries?: JournalEntryWithDay[]
+  targetChallengeId?: string
 }
 
-export default function MyJournalSection({ initialEntries }: MyJournalSectionProps) {
+export default function MyJournalSection({ initialEntries, targetChallengeId }: MyJournalSectionProps) {
   const [entries, setEntries] = useState<JournalEntryWithDay[]>(initialEntries ?? [])
   const [loading, setLoading] = useState<boolean>(!initialEntries)
 
   useEffect(() => {
     if (!initialEntries) {
-      getUserJournalEntries().then((res) => {
+      getUserJournalEntries(targetChallengeId).then((res) => {
         if (res.success && res.entries) {
           setEntries(res.entries)
         }
         setLoading(false)
       })
     }
-  }, [initialEntries])
+  }, [initialEntries, targetChallengeId])
 
   return (
     <section className="bg-[var(--bg-surface)] rounded-xl p-5 border border-[var(--border-hairline)] shadow-xs transition-colors mt-4">
@@ -85,7 +86,7 @@ export default function MyJournalSection({ initialEntries }: MyJournalSectionPro
               return (
                 <Link
                   key={entry.id}
-                  href={`/dashboard?day=${dayNum}`}
+                  href={`/dashboard?day=${dayNum}${targetChallengeId ? `&challenge=${targetChallengeId}` : ''}`}
                   className="block p-3.5 rounded-xl border border-[var(--border-hairline)] hover:border-[var(--flame-accent)]/40 hover:bg-[var(--bg-subtle)] transition group"
                 >
                   <div className="flex items-center justify-between mb-1.5">

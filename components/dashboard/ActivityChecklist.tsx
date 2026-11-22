@@ -3,7 +3,7 @@
 import { useOptimistic, useTransition } from 'react'
 import { toggleActivityCompletion } from '@/lib/actions/completions'
 import type { Activity } from '@/lib/types'
-import { Check, CheckCircle2, Play } from 'lucide-react'
+import { Check, CheckCircle2, Play, Lock } from 'lucide-react'
 import JournalNoteBox from '@/components/dashboard/JournalNoteBox'
 
 interface ActivityChecklistProps {
@@ -16,6 +16,7 @@ interface ActivityChecklistProps {
   currentDay?: number
   initialJournalContent?: string
   isPastoralPreview?: boolean
+  isCompletedChallenge?: boolean
 }
 
 export default function ActivityChecklist({
@@ -27,6 +28,7 @@ export default function ActivityChecklist({
   currentDay = 1,
   initialJournalContent = '',
   isPastoralPreview = false,
+  isCompletedChallenge = false,
 }: ActivityChecklistProps) {
   const [optimisticDone, toggleOptimistic] = useOptimistic(
     new Set(initialCompletedIds),
@@ -41,7 +43,7 @@ export default function ActivityChecklist({
   const [, startTransition] = useTransition()
 
   function handleToggle(activityId: string) {
-    if (!isToday || isPastoralPreview) return
+    if (!isToday || isPastoralPreview || isCompletedChallenge) return
     startTransition(async () => {
       toggleOptimistic(activityId)
       const res = await toggleActivityCompletion(activityId, dayId)
@@ -58,10 +60,18 @@ export default function ActivityChecklist({
 
   return (
     <div>
+      {/* Completed Challenge View-Only Banner */}
+      {isCompletedChallenge && (
+        <div className="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs flex items-center gap-2">
+          <Lock size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="font-semibold">Completed challenge — view only</span>
+        </div>
+      )}
+
       {/* Header row */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-[var(--text-ink)] text-sm tracking-tight">
-          Daily Consecration Disciplines
+          {isCompletedChallenge ? `Day ${dayNumber} Disciplines (Archive)` : 'Daily Consecration Disciplines'}
         </h3>
         <span className="text-xs font-semibold text-[var(--covenant-accent)] bg-[var(--covenant-subtle)] px-2.5 py-0.5 rounded-full border border-[var(--covenant-accent)]/20">
           {doneCount} of {total} completed
@@ -72,6 +82,8 @@ export default function ActivityChecklist({
       <div className="space-y-2">
         {sorted.map((activity) => {
           const done = optimisticDone.has(activity.id)
+          const isInteractive = isToday && !isPastoralPreview && !isCompletedChallenge
+
           return (
             <div
               key={activity.id}
@@ -81,18 +93,19 @@ export default function ActivityChecklist({
                 ${
                   done
                     ? 'bg-[var(--covenant-subtle)] border-[var(--covenant-accent)]/25'
-                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:border-[var(--flame-accent)]/50'
+                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]'
                 }
+                ${!isInteractive && !done ? 'opacity-90' : ''}
               `}
             >
               {/* Checkbox indicator & Text button */}
               <button
                 type="button"
                 onClick={() => handleToggle(activity.id)}
-                disabled={!isToday || isPastoralPreview}
+                disabled={!isInteractive}
                 className={`
                   flex items-start gap-3 min-w-0 flex-1 text-left
-                  ${!isToday || isPastoralPreview ? 'opacity-75 cursor-default' : 'cursor-pointer active:scale-[0.99]'}
+                  ${!isInteractive ? 'cursor-default' : 'cursor-pointer active:scale-[0.99]'}
                 `}
               >
                 {/* Checkbox indicator with deliberate motion spring */}
@@ -123,7 +136,7 @@ export default function ActivityChecklist({
                   >
                     {activity.description}
                   </p>
-                  {!done && isToday && (
+                  {!done && isToday && !isCompletedChallenge && (
                     <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
                       Today&apos;s spiritual discipline
                     </p>
@@ -175,6 +188,7 @@ export default function ActivityChecklist({
         currentDay={currentDay}
         initialContent={initialJournalContent}
         isPastoralPreview={isPastoralPreview}
+        isReadOnly={isCompletedChallenge}
       />
 
       {/* Status Banner */}

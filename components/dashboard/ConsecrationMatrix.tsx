@@ -17,6 +17,10 @@ interface ConsecrationMatrixProps {
   compact?: boolean
   /** When previewing as a specific member */
   asMemberId?: string | null
+  /** Selected challenge id for persistent deep-linking */
+  challengeId?: string | null
+  /** Whether this challenge is a completed view-only archive */
+  isCompletedChallenge?: boolean
 }
 
 type DayStatus = 'completed' | 'current' | 'missed' | 'upcoming'
@@ -24,9 +28,11 @@ type DayStatus = 'completed' | 'current' | 'missed' | 'upcoming'
 function getDayStatus(
   dayNumber: number,
   currentDay: number | null,
-  completedSet: Set<number>
+  completedSet: Set<number>,
+  isCompletedChallenge = false
 ): DayStatus {
   if (completedSet.has(dayNumber)) return 'completed'
+  if (isCompletedChallenge) return 'missed'
   if (dayNumber === currentDay) return 'current'
   if (currentDay !== null && dayNumber < currentDay) return 'missed'
   return 'upcoming'
@@ -47,6 +53,8 @@ export default function ConsecrationMatrix({
   durationDays = 40,
   challengeName = 'Overcomer',
   asMemberId,
+  challengeId,
+  isCompletedChallenge = false,
 }: ConsecrationMatrixProps) {
   const days = Array.from({ length: durationDays }, (_, i) => i + 1)
   const completedSet = new Set(completedDayNumbers)
@@ -60,7 +68,9 @@ export default function ConsecrationMatrix({
             {durationDays}-Day Consecration Matrix
           </h3>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Spiritual fidelity from Day 1 to Day {durationDays} · Tap past days to review
+            {isCompletedChallenge
+              ? `Archived Consecration Matrix · All ${durationDays} days unlocked for devotional review`
+              : `Spiritual fidelity from Day 1 to Day ${durationDays} · Tap past days to review`}
           </p>
         </div>
         <div className="flex flex-col items-center bg-[var(--covenant-subtle)] rounded-xl px-3 py-1.5 border border-[var(--covenant-accent)]/20">
@@ -74,10 +84,10 @@ export default function ConsecrationMatrix({
       {/* Grid: 7 columns */}
       <div className="grid grid-cols-7 gap-1.5 mt-3">
         {days.map((day) => {
-          const status = getDayStatus(day, currentDay, completedSet)
-          const isAvailable = (currentDay !== null && day <= currentDay) || completedSet.has(day)
+          const status = getDayStatus(day, currentDay, completedSet, isCompletedChallenge)
+          const isAvailable = isCompletedChallenge || (currentDay !== null && day <= currentDay) || completedSet.has(day)
           const isSelected = selectedDay === day
-          const linkHref = `/dashboard?day=${day}${asMemberId ? `&as_member=${asMemberId}` : ''}`
+          const linkHref = `/dashboard?day=${day}${challengeId ? `&challenge=${challengeId}` : ''}${asMemberId ? `&as_member=${asMemberId}` : ''}`
 
           const cellContent = (
             <div
@@ -116,18 +126,32 @@ export default function ConsecrationMatrix({
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-4 mt-3 pt-2.5 border-t border-[var(--border-subtle)]">
-        {[
-          { color: 'bg-[var(--covenant-accent)]', label: 'Completed' },
-          { color: 'bg-[var(--flame-accent)]', label: 'Today' },
-          { color: 'bg-[var(--bg-subtle)] border border-[var(--border-subtle)]', label: 'Upcoming' },
-        ].map(({ color, label }) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-xs ${color}`} />
-            <span className="text-[10px] text-[var(--text-muted)] font-medium">
-              {label}
-            </span>
-          </div>
-        ))}
+        {isCompletedChallenge ? (
+          [
+            { color: 'bg-[var(--covenant-accent)]', label: 'Completed' },
+            { color: 'bg-[var(--bg-subtle)] border border-[var(--border-subtle)]', label: 'Uncompleted' },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={`w-2.5 h-2.5 rounded-xs ${color}`} />
+              <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                {label}
+              </span>
+            </div>
+          ))
+        ) : (
+          [
+            { color: 'bg-[var(--covenant-accent)]', label: 'Completed' },
+            { color: 'bg-[var(--flame-accent)]', label: 'Today' },
+            { color: 'bg-[var(--bg-subtle)] border border-[var(--border-subtle)]', label: 'Upcoming' },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={`w-2.5 h-2.5 rounded-xs ${color}`} />
+              <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                {label}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

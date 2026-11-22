@@ -32,6 +32,24 @@ export async function toggleActivityCompletion(
       return { success: false, error: 'Invalid activity or challenge day identifier.' }
     }
 
+    // ── Guardrail: ensure challenge is active and day is current ──
+    const { data: dayRow } = await supabase
+      .from('challenge_days')
+      .select('id, challenge_id, day_number')
+      .eq('id', challengeDayId)
+      .single()
+
+    if (!dayRow) {
+      return { success: false, error: 'Challenge day not found.' }
+    }
+
+    if (dayRow.challenge_id) {
+      const { data: statusRes } = await supabase.rpc('get_challenge_status', { c_id: dayRow.challenge_id })
+      if (statusRes !== 'active') {
+        return { success: false, error: 'This challenge is archived. Disciplines cannot be modified.' }
+      }
+    }
+
     // ── 1. Toggle the individual activity completion ───────────
     const { data: existing, error: existingError } = await supabase
       .from('activity_completions')
