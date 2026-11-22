@@ -231,6 +231,7 @@ export interface HubCourseItem {
   id: string
   name: string
   description: string | null
+  created_at?: string | null
   enrollment_mode: EnrollmentMode
   access_mode: CourseAccessMode | null
   access_end_date: string | null

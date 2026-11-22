@@ -26,6 +26,8 @@ export interface HubChallengeItem {
   user_rank: number | null
   total_participants: number
   progress_pct: number
+  created_at?: string | null
+  description?: string | null
 }
 
 export interface HubDataResponse {
@@ -297,6 +299,8 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         user_rank: userRank,
         total_participants: totalRanked,
         progress_pct: pct,
+        created_at: c.created_at || null,
+        description: c.description || null,
       }
     })
   )

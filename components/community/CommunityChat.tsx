@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Sparkles, MessageSquare, Send, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Sparkles, MessageSquare, Send, Trash2, Loader2, Image as ImageIcon, X, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { postMessage, deleteMessage, markChatAsSeen } from '@/lib/actions/messages'
 import UserAvatar from '@/components/UserAvatar'
@@ -59,6 +60,7 @@ export default function CommunityChat({
   durationDays = 40,
   challengeName = 'Overcomer',
 }: CommunityChatProps) {
+  const router = useRouter()
   const [messages, setMessages] = useState<MessageWithSender[]>(initialMessages)
   const [text, setText] = useState('')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
@@ -395,6 +397,14 @@ export default function CommunityChat({
       <header className="sticky top-0 z-30 bg-[var(--bg-canvas)]/90 backdrop-blur-md px-4 pt-4 pb-3 border-b border-[var(--border-hairline)] transition-colors">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Back"
+              className="p-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-ink)] transition shadow-2xs cursor-pointer"
+            >
+              <ArrowLeft size={16} />
+            </button>
             <BBCCLogo size="sm" />
             <div className="leading-tight">
               <h1 className="text-sm font-semibold tracking-tight text-[var(--text-ink)] flex items-center gap-1.5">
@@ -409,12 +419,6 @@ export default function CommunityChat({
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Link
-              href="/dashboard"
-              className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-surface)] border border-[var(--border-hairline)] px-2.5 py-1 rounded-lg transition"
-            >
-              Today
-            </Link>
           </div>
         </div>
       </header>
@@ -592,8 +596,11 @@ export default function CommunityChat({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Fixed Chat Input Bar (Above BottomNav) ────────────── */}
-      <div className="fixed bottom-[56px] left-0 right-0 z-40 bg-[var(--bg-canvas)]/95 backdrop-blur-md border-t border-[var(--border-hairline)] transition-colors">
+      {/* ── Fixed Chat Input Bar (Directly at viewport bottom) ──── */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-canvas)]/95 backdrop-blur-md border-t border-[var(--border-hairline)] transition-colors"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <form
           onSubmit={handleSend}
           className="max-w-md mx-auto px-4 py-2.5 flex flex-col gap-2"

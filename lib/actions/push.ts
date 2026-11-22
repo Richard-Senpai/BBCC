@@ -138,7 +138,7 @@ export async function updateNotificationPreferences(prefs: {
       return { success: false, error: error.message }
     }
 
-    revalidatePath('/dashboard/profile')
+    revalidatePath('/profile')
     return { success: true }
   } catch (err) {
     console.error('[updateNotificationPreferences] Unexpected error:', err)
@@ -172,7 +172,7 @@ export async function sendTestPushToSelf(): Promise<{
     const result = await sendPushToUsers([user.id], 'announcements', {
       title: 'BBCC Consecration Push Active',
       body: 'Your device is successfully configured to receive fellowship updates and daily disciplines.',
-      url: '/dashboard/profile',
+      url: '/profile',
       tag: 'test-push',
     })
 

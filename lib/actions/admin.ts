@@ -697,6 +697,7 @@ export async function updateChallenge(
     revalidatePath('/leaderboard')
     revalidatePath('/hub')
     revalidatePath('/challenges')
+    revalidatePath('/home')
 
     return { success: true }
   } catch (err) {
@@ -782,6 +783,7 @@ export async function toggleCoursePublished(
     revalidatePath('/admin')
     revalidatePath('/hub')
     revalidatePath('/challenges')
+    revalidatePath('/home')
     return { success: true, isPublished: willPublish }
   } catch (err) {
     return {
@@ -1569,6 +1571,7 @@ export async function decideChallengeEnrollment(params: {
     revalidatePath('/admin')
     revalidatePath('/hub')
     revalidatePath('/challenges')
+    revalidatePath('/home')
     revalidatePath('/dashboard')
     revalidatePath('/leaderboard')
     return { success: true }
@@ -1605,6 +1608,7 @@ export async function decideAllPendingEnrollments(params: {
     revalidatePath('/admin')
     revalidatePath('/hub')
     revalidatePath('/challenges')
+    revalidatePath('/home')
     revalidatePath('/dashboard')
     revalidatePath('/leaderboard')
     return { success: true, count: data?.length ?? 0 }
@@ -1638,6 +1642,7 @@ export async function removeEnrolledMember(params: {
     revalidatePath('/admin')
     revalidatePath('/hub')
     revalidatePath('/challenges')
+    revalidatePath('/home')
     revalidatePath('/dashboard')
     revalidatePath('/leaderboard')
     return { success: true }
@@ -1903,6 +1908,7 @@ export async function deleteChallenge(
     revalidatePath('/leaderboard')
     revalidatePath('/hub')
     revalidatePath('/challenges')
+    revalidatePath('/home')
 
     return { success: true }
   } catch (err) {

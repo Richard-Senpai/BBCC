@@ -27,7 +27,7 @@ export default function AnnouncementBell({
       })
     }
 
-    router.push('/dashboard/profile#announcements')
+    router.push('/profile#announcements')
   }
 
   return (

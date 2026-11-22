@@ -81,11 +81,11 @@ export default async function LessonPage({ params, searchParams }: PageProps) {
             Church administration is updating this curriculum. Please check back shortly.
           </p>
           <Link
-            href="/hub"
+            href="/challenges"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition"
           >
             <ArrowLeft size={13} />
-            <span>Back to Challenge Hub</span>
+            <span>Back to Challenges</span>
           </Link>
         </div>
       </div>
@@ -107,11 +107,11 @@ export default async function LessonPage({ params, searchParams }: PageProps) {
             Your access ended on {formatExpiryDate(result.expiryDate)}. Please reach out to church admin.
           </p>
           <Link
-            href="/hub"
+            href="/challenges"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-subtle)] text-xs font-semibold transition"
           >
             <ArrowLeft size={13} />
-            <span>Back to Challenge Hub</span>
+            <span>Back to Challenges</span>
           </Link>
         </div>
       </div>

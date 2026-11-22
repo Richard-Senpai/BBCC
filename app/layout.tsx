@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Newsreader } from 'next/font/google'
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
+import BottomNav from '@/components/BottomNav'
 import './globals.css'
 
 const sans = Plus_Jakarta_Sans({
@@ -63,6 +64,7 @@ export default function RootLayout({
       >
         <ServiceWorkerRegister />
         {children}
+        <BottomNav />
       </body>
     </html>
   )

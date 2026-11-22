@@ -77,11 +77,11 @@ export default async function CourseCompletedPage({ params }: PageProps) {
           {/* Action Buttons */}
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/hub"
+              href="/challenges"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition cursor-pointer active:scale-[0.99]"
             >
               <ArrowLeft size={14} />
-              <span>Back to Hub</span>
+              <span>Back to Challenges</span>
             </Link>
 
             <Link

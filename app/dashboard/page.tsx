@@ -8,6 +8,9 @@ import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
 import ActivityChecklist from '@/components/dashboard/ActivityChecklist'
 import ConsecrationMatrix from '@/components/dashboard/ConsecrationMatrix'
+import ChallengeTabBar from '@/components/dashboard/ChallengeTabBar'
+import ChallengeProgressView from '@/components/dashboard/ChallengeProgressView'
+import ChallengeLeaderboardView from '@/components/dashboard/ChallengeLeaderboardView'
 import {
   Flame,
   BookOpen,
@@ -107,11 +110,11 @@ function UpcomingChallengeView({
       </p>
       <div className="mt-6">
         <Link
-          href="/hub"
+          href="/challenges"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[var(--flame-accent)] hover:opacity-90 px-4 py-2 rounded-xl shadow-xs transition"
         >
           <Layers size={13} />
-          <span>Return to Challenge Hub</span>
+          <span>Return to Challenges &amp; Courses</span>
         </Link>
       </div>
     </div>
@@ -129,15 +132,15 @@ function NoActiveChallengeView({ profile }: { profile: Profile }) {
         Between Consecration Cycles
       </h1>
       <p className="text-[var(--text-muted)] text-sm max-w-xs mx-auto leading-relaxed">
-        Welcome, {firstName}. There is no active consecration running right now. You can revisit past challenges or preview upcoming cycles from the Hub.
+        Welcome, {firstName}. There is no active consecration running right now. You can revisit past challenges or preview upcoming cycles from Challenges.
       </p>
       <div className="mt-6">
         <Link
-          href="/hub"
+          href="/challenges"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[var(--flame-accent)] hover:opacity-90 px-4 py-2 rounded-xl shadow-xs transition"
         >
           <Layers size={13} />
-          <span>Open Consecration Hub</span>
+          <span>Open Challenges</span>
         </Link>
       </div>
     </div>
@@ -154,6 +157,7 @@ interface DashboardPageProps {
     challenge?: string
     as_member?: string
     preview?: string
+    tab?: string
   }>
 }
 
@@ -226,17 +230,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   // ── Handle Edge Case: Non-enrolled in Approval Challenge ───────
   if (!isAdmin && !challengeCtx.canAccess) {
-    redirect('/hub')
+    redirect('/challenges')
   }
 
   // ── Handle Edge Case: Upcoming Challenge ───────────────────
   if (challengeStatus === 'upcoming') {
     return (
       <>
-        <DashboardHeader
-          profile={displayProfile}
-          streak={0}
+        <ChallengeTabBar
+          currentTab="today"
+          challengeId={targetChallengeId}
           challengeTitle={challengeTitle}
+          currentDay={0}
+          durationDays={durationDays}
+          streak={0}
         />
         <UpcomingChallengeView
           profile={displayProfile}
@@ -251,10 +258,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   if (!targetChallenge && !targetChallengeId) {
     return (
       <>
-        <DashboardHeader
-          profile={displayProfile}
-          streak={0}
+        <ChallengeTabBar
+          currentTab="today"
+          challengeId={undefined}
           challengeTitle="BBCC Consecration"
+          streak={0}
         />
         <NoActiveChallengeView profile={displayProfile} />
       </>
@@ -262,6 +270,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const isCompletedChallenge = challengeStatus === 'completed'
+  const activeTab: 'today' | 'progress' | 'leaderboard' =
+    resolvedParams.tab === 'progress'
+      ? 'progress'
+      : resolvedParams.tab === 'leaderboard'
+      ? 'leaderboard'
+      : 'today'
 
   // ── Calculate Active Day ────────────────────────────────────
   // For completed challenge: default to day 1 (or requested ?day=)
@@ -326,9 +340,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           .from('activity_completions')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', effectiveMemberId),
-    isCompletedChallenge && targetChallengeId
-      ? supabase.rpc('get_leaderboard', { target_challenge_id: targetChallengeId })
-      : Promise.resolve({ data: null }),
+    activeTab === 'leaderboard' || isCompletedChallenge
+      ? targetChallengeId
+        ? supabase.rpc('get_leaderboard', { target_challenge_id: targetChallengeId })
+        : supabase.rpc('get_leaderboard')
+      : Promise.resolve({ data: null, error: null }),
   ])
 
   const dayRow = challengeRes.data
@@ -428,37 +444,73 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </aside>
       )}
 
-      {/* ── Header ─────────────────────────────────────────── */}
-      <DashboardHeader
-        profile={profile}
-        streak={stats.current_streak}
+      {/* ── Challenge Top Segmented Control & Navigation ───── */}
+      <ChallengeTabBar
+        currentTab={activeTab}
+        challengeId={targetChallengeId}
         challengeTitle={challengeTitle}
+        currentDay={currentDay}
+        durationDays={durationDays}
+        streak={stats.current_streak}
       />
 
-      {/* ── COMPLETED CHALLENGE: View-Only Archive Banner ───── */}
-      {isCompletedChallenge && (
-        <div className="mx-4 mt-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between shadow-2xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
-              <Lock size={15} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                Completed Challenge — View-Only Archive
-              </p>
-              <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 truncate">
-                All {durationDays} days are unlocked for devotional study. Checklists &amp; notes are read-only.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/hub"
-            className="text-[11px] font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 px-2.5 py-1 rounded-lg shrink-0 transition"
-          >
-            Hub
-          </Link>
-        </div>
+      {/* ── PROGRESS TAB VIEW ───────────────────────────────── */}
+      {activeTab === 'progress' && (
+        <ChallengeProgressView
+          profile={displayProfile}
+          challengeName={challengeName}
+          challengeId={targetChallengeId}
+          durationDays={durationDays}
+          currentDay={currentDay}
+          isCompletedChallenge={isCompletedChallenge}
+          stats={stats}
+          completedDayNumbers={completedDayNumbers}
+          effectiveMemberId={effectiveMemberId}
+        />
       )}
+
+      {/* ── LEADERBOARD TAB VIEW ────────────────────────────── */}
+      {activeTab === 'leaderboard' && (
+        <ChallengeLeaderboardView
+          challengeTitle={challengeTitle}
+          durationDays={durationDays}
+          currentDay={currentDay}
+          isCompletedChallenge={isCompletedChallenge}
+          leaderboardRaw={leaderboardRes.data}
+          leaderboardError={leaderboardRes.error ? (leaderboardRes.error as any).message : null}
+          userProfile={displayProfile}
+          userStats={stats}
+          userActivitiesCount={userActivitiesCount}
+        />
+      )}
+
+      {/* ── TODAY TAB VIEW ─────────────────────────────────── */}
+      {activeTab === 'today' && (
+        <>
+          {/* ── COMPLETED CHALLENGE: View-Only Archive Banner ───── */}
+          {isCompletedChallenge && (
+            <div className="mx-4 mt-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
+                  <Lock size={15} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                    Completed Challenge — View-Only Archive
+                  </p>
+                  <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 truncate">
+                    All {durationDays} days are unlocked for devotional study. Checklists &amp; notes are read-only.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/challenges"
+                className="text-[11px] font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 px-2.5 py-1 rounded-lg shrink-0 transition"
+              >
+                Challenges
+              </Link>
+            </div>
+          )}
 
       {/* ── COMPLETED CHALLENGE: Personal Summary Records ────── */}
       {isCompletedChallenge && (
@@ -688,57 +740,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </button>
         </div>
       </section>
+        </>
+      )}
     </>
-  )
-}
-
-// ─────────────────────────────────────────
-// Header Sub-Component
-// ─────────────────────────────────────────
-
-function DashboardHeader({
-  profile,
-  streak,
-  challengeTitle,
-}: {
-  profile: Profile
-  streak: number
-  challengeTitle?: string
-}) {
-  return (
-    <header className="px-4 pt-5 pb-2 flex items-center justify-between">
-      {/* Left: logo + app name */}
-      <div className="flex items-center gap-2.5">
-        <BBCCLogo size="sm" />
-        <div className="leading-tight">
-          <p className="text-xs font-bold text-[var(--text-ink)] tracking-tight">
-            {challengeTitle ?? 'BBCC Consecration'}
-          </p>
-          <p className="text-[10px] text-[var(--text-muted)]">Believers&apos; Banquet</p>
-        </div>
-      </div>
-
-      {/* Right: Switch Challenge button + streak pill + theme toggle + sign-out */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/hub"
-          title="Switch Challenge Hub"
-          className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-ink)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-2.5 py-1 rounded-full transition shadow-2xs"
-        >
-          <Layers size={12} className="text-[var(--flame-accent)]" />
-          <span>Hub</span>
-        </Link>
-        {streak > 0 && (
-          <div className="flex items-center gap-1.5 bg-[var(--flame-subtle)] text-[var(--flame-accent)] border border-[var(--flame-accent)]/25 text-xs font-bold px-2.5 py-1 rounded-full">
-            <Flame size={13} strokeWidth={2.2} className="text-[var(--flame-accent)]" />
-            <span>
-              {streak} {streak === 1 ? 'Day' : 'Days'}
-            </span>
-          </div>
-        )}
-        <ThemeToggle />
-        <LogoutButton />
-      </div>
-    </header>
   )
 }

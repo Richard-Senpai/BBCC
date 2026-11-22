@@ -134,6 +134,8 @@ export async function toggleActivityCompletion(
     revalidatePath('/dashboard')
     revalidatePath('/dashboard/progress')
     revalidatePath('/leaderboard')
+    revalidatePath('/home')
+    revalidatePath('/profile')
 
     return { success: true }
   } catch (err) {

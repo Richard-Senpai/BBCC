@@ -222,6 +222,7 @@ export async function getMemberCoursesHubData(): Promise<HubCourseItem[]> {
       id: course.id,
       name: course.name,
       description: course.description ?? null,
+      created_at: course.created_at ?? null,
       enrollment_mode: enrollmentMode,
       access_mode: (course.access_mode as CourseAccessMode) || null,
       access_end_date: course.access_end_date ?? null,
@@ -739,6 +740,8 @@ export async function startMemberCourse(
     }
 
     revalidatePath(`/courses/${courseId}`)
+    revalidatePath('/challenges')
+    revalidatePath('/home')
     revalidatePath('/hub')
     return { success: true }
   } catch (err) {
@@ -801,6 +804,9 @@ export async function completeMemberLesson(
 
     revalidatePath(`/courses/${courseId}`)
     revalidatePath(`/courses/${courseId}/lessons/${lessonId}`)
+    revalidatePath('/challenges')
+    revalidatePath('/home')
+    revalidatePath('/profile')
     revalidatePath('/hub')
 
     return { success: true, completedCourse }

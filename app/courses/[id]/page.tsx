@@ -55,11 +55,11 @@ export default async function CoursePage({ params, searchParams }: PageProps) {
             {result.error || 'The requested course does not exist or has been removed.'}
           </p>
           <Link
-            href="/hub"
+            href="/challenges"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-xs font-semibold"
           >
             <ArrowLeft size={13} />
-            <span>Back to Hub</span>
+            <span>Back to Challenges</span>
           </Link>
         </div>
       </div>
@@ -81,11 +81,11 @@ export default async function CoursePage({ params, searchParams }: PageProps) {
             Church administration is updating this curriculum. Please check back shortly or explore other active challenges on the hub.
           </p>
           <Link
-            href="/hub"
+            href="/challenges"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition"
           >
             <ArrowLeft size={13} />
-            <span>Back to Challenge Hub</span>
+            <span>Back to Challenges</span>
           </Link>
         </div>
       </div>
@@ -107,11 +107,11 @@ export default async function CoursePage({ params, searchParams }: PageProps) {
             Your access ended on {formatExpiryDate(result.expiryDate)}. Please reach out to church admin.
           </p>
           <Link
-            href="/hub"
+            href="/challenges"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-subtle)] text-xs font-semibold transition"
           >
             <ArrowLeft size={13} />
-            <span>Back to Challenge Hub</span>
+            <span>Back to Challenges</span>
           </Link>
         </div>
       </div>
@@ -133,11 +133,11 @@ export default async function CoursePage({ params, searchParams }: PageProps) {
             This course requires enrollment approval. Please return to the challenge hub to submit your join request.
           </p>
           <Link
-            href="/hub"
+            href="/challenges"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition"
           >
             <ArrowLeft size={13} />
-            <span>Go to Challenge Hub</span>
+            <span>Go to Challenges</span>
           </Link>
         </div>
       </div>

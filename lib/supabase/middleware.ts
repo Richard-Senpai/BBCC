@@ -39,11 +39,14 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isProtectedMember =
+    pathname.startsWith('/home') ||
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/community') ||
     pathname.startsWith('/leaderboard') ||
     pathname.startsWith('/hub') ||
-    pathname.startsWith('/challenges')
+    pathname.startsWith('/challenges') ||
+    pathname.startsWith('/courses') ||
+    pathname.startsWith('/profile')
   const isProtectedAdmin = pathname.startsWith('/admin')
   const isHoldingRoute = pathname.startsWith('/pending')
   const isAuthRoute =
@@ -87,21 +90,21 @@ export async function updateSession(request: NextRequest) {
     // If they hit /pending holding page, redirect to their home
     if (isHoldingRoute) {
       const url = request.nextUrl.clone()
-      url.pathname = isAdmin ? '/admin' : '/hub'
+      url.pathname = isAdmin ? '/admin' : '/home'
       return NextResponse.redirect(url)
     }
 
     // If they hit an auth route (login/signup) → redirect to their home
     if (isAuthRoute) {
       const url = request.nextUrl.clone()
-      url.pathname = isAdmin ? '/admin' : '/hub'
+      url.pathname = isAdmin ? '/admin' : '/home'
       return NextResponse.redirect(url)
     }
 
-    // Admin-only area accessed by a non-admin → redirect to hub
+    // Admin-only area accessed by a non-admin → redirect to home
     if (isProtectedAdmin && !isAdmin) {
       const url = request.nextUrl.clone()
-      url.pathname = '/hub'
+      url.pathname = '/home'
       return NextResponse.redirect(url)
     }
   }

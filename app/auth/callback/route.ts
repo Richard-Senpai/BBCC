@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   // next=<path> can be passed to redirect somewhere specific after login
-  const next = searchParams.get('next') ?? '/hub'
+  const next = searchParams.get('next') ?? '/home'
 
   if (code) {
     const supabase = await createClient()
@@ -35,8 +35,8 @@ export async function GET(request: Request) {
           destination = '/admin'
         } else if (profile?.status === 'pending' || profile?.status === 'rejected') {
           destination = '/pending'
-        } else if (destination === '/dashboard') {
-          destination = '/hub'
+        } else if (destination === '/dashboard' || destination === '/hub') {
+          destination = '/home'
         }
 
         return NextResponse.redirect(`${origin}${destination}`)

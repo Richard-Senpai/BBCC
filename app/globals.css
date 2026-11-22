@@ -10,12 +10,14 @@
   --color-surface: var(--bg-surface);
   --color-subtle: var(--bg-subtle);
   --color-border: var(--border-subtle);
+  --color-border-hairline: var(--border-hairline);
   --color-border-strong: var(--border-strong);
   --color-ink: var(--text-ink);
   --color-muted: var(--text-muted);
   --color-faint: var(--text-faint);
   --color-flame: var(--flame-accent);
   --color-covenant: var(--covenant-accent);
+  --color-course: var(--course-accent);
 }
 
 :root {
@@ -23,6 +25,7 @@
   --bg-surface: #FFFFFF;
   --bg-subtle: #EFEFEA;
   --border-subtle: #E5E5DF;
+  --border-hairline: #ECECE7;
   --border-strong: #D2D2CA;
   --text-ink: #17181A;
   --text-muted: #666972;
@@ -31,6 +34,8 @@
   --flame-subtle: #FDF5ED;
   --covenant-accent: #236B46;
   --covenant-subtle: #EEF7F2;
+  --course-accent: #0E6B7A;
+  --course-subtle: #EFF8FA;
 }
 
 .dark {
@@ -38,6 +43,7 @@
   --bg-surface: #18191D;
   --bg-subtle: #202227;
   --border-subtle: #27292F;
+  --border-hairline: #1F2126;
   --border-strong: #3A3D46;
   --text-ink: #F1F2F4;
   --text-muted: #8E929C;
@@ -46,6 +52,8 @@
   --flame-subtle: #271A10;
   --covenant-accent: #34D399;
   --covenant-subtle: #0E2218;
+  --course-accent: #38BDF8;
+  --course-subtle: #0C242C;
 }
 
 body {

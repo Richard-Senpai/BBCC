@@ -80,7 +80,7 @@ export async function createAnnouncement(
         sendPushToUsers(memberIds, 'announcements', {
           title: cleanTitle,
           body: cleanBody.length > 140 ? `${cleanBody.slice(0, 137)}...` : cleanBody,
-          url: '/dashboard/profile#announcements',
+          url: '/profile#announcements',
           tag: `announcement-${data.id}`,
         }).catch((pushErr) => {
           console.error('[createAnnouncement] Error dispatching push notification:', pushErr)
@@ -90,9 +90,10 @@ export async function createAnnouncement(
       console.error('[createAnnouncement] Failed to initiate push notification dispatch:', pushDispatchErr)
     }
 
-    revalidatePath('/dashboard/profile')
-    revalidatePath('/dashboard/progress')
-    revalidatePath('/leaderboard')
+    revalidatePath('/home')
+    revalidatePath('/profile')
+    revalidatePath('/challenges')
+    revalidatePath('/dashboard')
     revalidatePath('/admin')
 
     return { success: true, announcement: data as Announcement }

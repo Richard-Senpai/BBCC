@@ -85,8 +85,8 @@ export async function saveJournalEntry(
     }
 
     revalidatePath('/dashboard')
-    revalidatePath('/dashboard/progress')
-    revalidatePath('/dashboard/profile')
+    revalidatePath('/home')
+    revalidatePath('/profile')
 
     return { success: true, entry: data as JournalEntry }
   } catch (err) {

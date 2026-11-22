@@ -203,10 +203,10 @@ export async function markChatAsSeen(): Promise<{ success: boolean; error?: stri
     }
 
     revalidatePath('/community')
+    revalidatePath('/home')
+    revalidatePath('/profile')
+    revalidatePath('/challenges')
     revalidatePath('/dashboard')
-    revalidatePath('/dashboard/progress')
-    revalidatePath('/leaderboard')
-    revalidatePath('/dashboard/profile')
 
     return { success: true }
   } catch (err) {

@@ -21,12 +21,12 @@ self.addEventListener('push', (event) => {
     payload = {
       title: 'BBCC Consecration',
       body: event.data.text() || 'New fellowship update.',
-      url: '/dashboard',
+      url: '/home',
     };
   }
 
   const title = payload.title || 'BBCC Consecration';
-  const targetUrl = payload.url || (payload.data && payload.data.url) || '/dashboard';
+  const targetUrl = payload.url || (payload.data && payload.data.url) || '/home';
 
   const options = {
     body: payload.body || '',
@@ -47,7 +47,7 @@ self.addEventListener('push', (event) => {
 // ── Handle notification click & navigation ───────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/dashboard';
+  const targetUrl = event.notification.data?.url || '/home';
 
   event.waitUntil(
     self.clients
