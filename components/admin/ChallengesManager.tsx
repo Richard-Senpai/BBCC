@@ -36,6 +36,7 @@ import {
   ListOrdered,
 } from 'lucide-react'
 import UserAvatar from '@/components/UserAvatar'
+import { LessonContentEditorModal } from '@/components/admin/course-editor/LessonContentEditorModal'
 import {
   createChallenge,
   updateChallenge,
@@ -2834,41 +2835,23 @@ function CourseOutlineModal({
           </div>
         )}
 
-        {/* ── Lesson Content Placeholder Modal ── */}
+        {/* ── Real Lesson Content Editor Modal ── */}
         {contentLesson && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div className="bg-[var(--bg-surface)] w-full max-w-md rounded-2xl border border-purple-500/30 shadow-2xl p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/15 text-purple-600 dark:text-purple-400 mx-auto flex items-center justify-center border border-purple-500/30">
-                <BookOpen size={24} strokeWidth={2} />
-              </div>
-              <div>
-                <h4 className="text-base font-bold text-[var(--text-ink)] font-serif">
-                  Lesson Content Editor
-                </h4>
-                <p className="text-xs font-semibold text-purple-700 dark:text-purple-300 mt-0.5">
-                  &quot;{contentLesson.title}&quot;
-                </p>
-                <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">
-                  The interactive block editor (Rich Text, Scripture Notes, Video Streams, Media, and Action Confirmation checkpoints) is scheduled for the next system phase. The course schema and sequential prerequisite locking engine are fully active.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/15 text-[11px] text-purple-900 dark:text-purple-200 text-left space-y-1">
-                <p className="font-semibold">Ready Infrastructure:</p>
-                <p>• Database table: <code className="font-mono text-[10px]">course_blocks</code></p>
-                <p>• RLS policies: Locked lessons prevent block inspection</p>
-                <p>• Prerequisite functions: <code className="font-mono text-[10px]">complete_lesson()</code></p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setContentLesson(null)}
-                className="w-full py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-xs transition cursor-pointer"
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
+          <LessonContentEditorModal
+            courseId={course.id}
+            lessonId={contentLesson.id}
+            isOpen={Boolean(contentLesson)}
+            onClose={() => setContentLesson(null)}
+            onLessonSaved={() => {
+              loadLessons()
+              onUpdated()
+            }}
+            allLessons={lessons}
+            onSelectLesson={(nextId) => {
+              const next = lessons.find((l) => l.id === nextId)
+              if (next) setContentLesson(next)
+            }}
+          />
         )}
       </div>
     </div>

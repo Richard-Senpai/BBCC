@@ -17,7 +17,10 @@ import type {
   ChallengeType,
   CourseAccessMode,
   CourseLesson,
+  CourseBlock,
+  CourseBlockType,
 } from '@/lib/types'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 function checkDateOverlap(
   startA: string,
@@ -950,6 +953,20 @@ export async function deleteCourseLesson(
       .select('*', { count: 'exact', head: true })
       .eq('lesson_id', lessonId)
 
+    // 2b. Collect media storage paths from blocks to clean up
+    const { data: lessonBlocks } = await supabase
+      .from('course_blocks')
+      .select('content')
+      .eq('lesson_id', lessonId)
+
+    const mediaPathsToDelete: string[] = []
+    for (const b of lessonBlocks || []) {
+      const c = b.content as Record<string, unknown> | null
+      if (c?.storage_path && typeof c.storage_path === 'string') {
+        mediaPathsToDelete.push(c.storage_path)
+      }
+    }
+
     // 3. Delete lesson (cascades to blocks and completions)
     const { error: delErr } = await supabase
       .from('course_lessons')
@@ -958,6 +975,15 @@ export async function deleteCourseLesson(
 
     if (delErr) {
       return { success: false, error: delErr.message }
+    }
+
+    // Clean up media files from storage bucket
+    if (mediaPathsToDelete.length > 0) {
+      try {
+        await supabase.storage.from('course-media').remove(mediaPathsToDelete)
+      } catch (storageErr) {
+        console.warn('[deleteCourseLesson] Warning cleaning up media files:', storageErr)
+      }
     }
 
     // 4. Re-sequence remaining lessons
@@ -1079,6 +1105,323 @@ export async function extendMemberCourseAccess(params: {
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Failed to extend member course access',
+    }
+  }
+}
+
+/**
+ * Fetch a single lesson with all of its content blocks ordered by position.
+ */
+export async function getLessonWithBlocks(
+  lessonId: string
+): Promise<{
+  success: boolean
+  lesson?: CourseLesson
+  blocks?: CourseBlock[]
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    const { data: lesson, error: lErr } = await supabase
+      .from('course_lessons')
+      .select('*')
+      .eq('id', lessonId)
+      .single()
+
+    if (lErr || !lesson) {
+      return { success: false, error: 'Lesson not found.' }
+    }
+
+    const { data: blocks, error: bErr } = await supabase
+      .from('course_blocks')
+      .select('*')
+      .eq('lesson_id', lessonId)
+      .order('position', { ascending: true })
+
+    if (bErr) {
+      return { success: false, error: bErr.message }
+    }
+
+    return {
+      success: true,
+      lesson,
+      blocks: blocks ?? [],
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to fetch lesson blocks',
+    }
+  }
+}
+
+/**
+ * Save lesson content and full list of blocks.
+ * Handles:
+ * 1. Updating lesson title and summary.
+ * 2. Sanitizing rich text HTML on save.
+ * 3. Detecting removed blocks or replaced images and deleting their media files from storage.
+ * 4. Upserting blocks with updated positions.
+ * 5. Returns updated blocks list with database IDs.
+ */
+export async function saveLessonContent(params: {
+  lessonId: string
+  title: string
+  summary?: string | null
+  blocks: {
+    id?: string
+    position: number
+    type: CourseBlockType
+    content: Record<string, unknown>
+    required: boolean
+  }[]
+}): Promise<{
+  success: boolean
+  blocks?: CourseBlock[]
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+    const { lessonId, title, summary, blocks } = params
+
+    if (!lessonId) {
+      return { success: false, error: 'Lesson ID is required.' }
+    }
+    if (!title || !title.trim()) {
+      return { success: false, error: 'Lesson title cannot be empty.' }
+    }
+
+    // 1. Update lesson metadata
+    const { error: lessonUpdErr } = await supabase
+      .from('course_lessons')
+      .update({
+        title: title.trim(),
+        summary: summary !== undefined ? (summary?.trim() || null) : undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId)
+
+    if (lessonUpdErr) {
+      return { success: false, error: `Failed to update lesson: ${lessonUpdErr.message}` }
+    }
+
+    // 2. Fetch existing blocks in database for cleanup comparison
+    const { data: existingBlocks } = await supabase
+      .from('course_blocks')
+      .select('id, content')
+      .eq('lesson_id', lessonId)
+
+    const incomingIds = new Set(blocks.map((b) => b.id).filter(Boolean))
+    const orphanedMediaPaths: string[] = []
+
+    // A. Detect blocks deleted by admin
+    for (const eb of existingBlocks || []) {
+      if (!incomingIds.has(eb.id)) {
+        const c = eb.content as Record<string, unknown> | null
+        if (c?.storage_path && typeof c.storage_path === 'string') {
+          orphanedMediaPaths.push(c.storage_path)
+        }
+      }
+    }
+
+    // B. Detect image replacement within surviving blocks
+    for (const b of blocks) {
+      if (b.id) {
+        const existing = (existingBlocks || []).find((eb) => eb.id === b.id)
+        if (existing) {
+          const oldContent = existing.content as Record<string, unknown> | null
+          const newContent = b.content as Record<string, unknown> | null
+          if (
+            oldContent?.storage_path &&
+            typeof oldContent.storage_path === 'string' &&
+            oldContent.storage_path !== newContent?.storage_path
+          ) {
+            orphanedMediaPaths.push(oldContent.storage_path)
+          }
+        }
+      }
+    }
+
+    // Delete orphaned media from course-media bucket
+    if (orphanedMediaPaths.length > 0) {
+      try {
+        await supabase.storage.from('course-media').remove(orphanedMediaPaths)
+      } catch (storageErr) {
+        console.warn('[saveLessonContent] Warning removing replaced/deleted media:', storageErr)
+      }
+    }
+
+    // 3. Delete blocks removed from UI
+    const removedIds = (existingBlocks || [])
+      .map((eb) => eb.id)
+      .filter((id) => !incomingIds.has(id))
+
+    if (removedIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from('course_blocks')
+        .delete()
+        .in('id', removedIds)
+
+      if (delErr) {
+        return { success: false, error: `Failed to remove old blocks: ${delErr.message}` }
+      }
+    }
+
+    // 4. Sanitize and prepare blocks to save
+    const preparedBlocks = blocks.map((b, index) => {
+      const blockContent = { ...(b.content || {}) }
+
+      // Sanitize rich text HTML
+      if (b.type === 'rich_text' && typeof blockContent.html === 'string') {
+        blockContent.html = sanitizeHtml(blockContent.html)
+      } else if (b.type === 'image_text' && typeof blockContent.html === 'string') {
+        blockContent.html = sanitizeHtml(blockContent.html)
+      }
+
+      return {
+        ...(b.id ? { id: b.id } : {}),
+        lesson_id: lessonId,
+        position: index + 1,
+        type: b.type,
+        content: blockContent,
+        required: b.type === 'link' ? Boolean(b.required) : false,
+        updated_at: new Date().toISOString(),
+      }
+    })
+
+    // Upsert blocks
+    if (preparedBlocks.length > 0) {
+      const { error: upsertErr } = await supabase
+        .from('course_blocks')
+        .upsert(preparedBlocks, { onConflict: 'id' })
+
+      if (upsertErr) {
+        return { success: false, error: `Failed to save blocks: ${upsertErr.message}` }
+      }
+    }
+
+    // 5. Fetch and return current saved blocks
+    const { data: updatedBlocks, error: fetchErr } = await supabase
+      .from('course_blocks')
+      .select('*')
+      .eq('lesson_id', lessonId)
+      .order('position', { ascending: true })
+
+    if (fetchErr) {
+      return { success: false, error: fetchErr.message }
+    }
+
+    revalidatePath('/admin')
+    return { success: true, blocks: updatedBlocks ?? [] }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to save lesson content',
+    }
+  }
+}
+
+/**
+ * Upload an image file for a course into the course-media storage bucket.
+ * Restricted to administrators.
+ */
+export async function uploadCourseMedia(formData: FormData): Promise<{
+  success: boolean
+  url?: string
+  storagePath?: string
+  error?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    const file = formData.get('file') as File | null
+    const courseId = formData.get('courseId') as string | null
+
+    if (!file || !courseId) {
+      return { success: false, error: 'Image file and course ID are required.' }
+    }
+
+    // Validate size (max 5MB)
+    const maxBytes = 5 * 1024 * 1024
+    if (file.size > maxBytes) {
+      return { success: false, error: 'File size exceeds 5MB limit.' }
+    }
+
+    // Validate MIME type
+    const mime = file.type.toLowerCase()
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedMimes.includes(mime)) {
+      return { success: false, error: 'Only JPEG, PNG, WebP, or GIF images are supported.' }
+    }
+
+    const ext =
+      mime === 'image/png'
+        ? 'png'
+        : mime === 'image/webp'
+        ? 'webp'
+        : mime === 'image/gif'
+        ? 'gif'
+        : 'jpg'
+
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`
+    const storagePath = `courses/${courseId}/${fileName}`
+
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    const { error: uploadErr } = await supabase.storage
+      .from('course-media')
+      .upload(storagePath, buffer, {
+        contentType: mime,
+        upsert: true,
+      })
+
+    if (uploadErr) {
+      console.error('[uploadCourseMedia] Storage upload error:', uploadErr)
+      return { success: false, error: uploadErr.message }
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('course-media')
+      .getPublicUrl(storagePath)
+
+    return {
+      success: true,
+      url: urlData.publicUrl,
+      storagePath,
+    }
+  } catch (err) {
+    console.error('[uploadCourseMedia] Unexpected error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to upload image file',
+    }
+  }
+}
+
+/**
+ * Delete a media file from course-media bucket.
+ */
+export async function deleteCourseMediaFile(
+  storagePath: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+    if (!storagePath) return { success: true }
+
+    const { error } = await supabase.storage
+      .from('course-media')
+      .remove([storagePath])
+
+    if (error) {
+      console.warn('[deleteCourseMediaFile] Remove warning:', error.message)
+    }
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to delete media file',
     }
   }
 }
@@ -1526,9 +1869,20 @@ export async function deleteChallenge(
         .delete()
         .eq('id', challengeId)
 
-      if (delErr) {
+    if (delErr) {
         return { success: false, error: `Deletion failed: ${delErr.message}` }
       }
+    }
+
+    // Clean up all media files for this course from course-media storage bucket
+    try {
+      const { data: fileList } = await supabase.storage.from('course-media').list(`courses/${challengeId}`)
+      if (fileList && fileList.length > 0) {
+        const paths = fileList.map((f) => `courses/${challengeId}/${f.name}`)
+        await supabase.storage.from('course-media').remove(paths)
+      }
+    } catch (storageErr) {
+      console.warn('[deleteChallenge] Warning removing course media folder:', storageErr)
     }
 
     // 3. Clear selected challenge session cookie if it pointed to this challenge

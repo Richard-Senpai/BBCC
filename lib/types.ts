@@ -118,12 +118,78 @@ export type CourseLesson = {
   completed_count?: number
 }
 
+// ─────────────────────────────────────────────────────────────
+// COURSE BLOCK CONTENT SHAPES (Stored in course_blocks.content jsonb)
+// Documented for shared use between Admin Editor and Member View
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 1. Rich Text Block Content
+ * Contains sanitized HTML supporting headings (h2, h3), bold, italic,
+ * bullet & numbered lists, blockquote (scripture), and links.
+ */
+export type RichTextBlockContent = {
+  html: string
+}
+
+/**
+ * 2. Image + Text Block Content
+ * Renders an image alongside rich text. On mobile, always stacks image above text.
+ */
+export type ImageTextBlockContent = {
+  image_url: string
+  storage_path?: string | null // e.g. "courses/<courseId>/<filename>" for storage cleanup
+  alt_text: string
+  caption?: string | null
+  image_position: 'left' | 'right' | 'top'
+  html: string
+}
+
+/**
+ * 3. Full-Width Image Block Content
+ */
+export type ImageBlockContent = {
+  image_url: string
+  storage_path?: string | null
+  alt_text: string
+  caption?: string | null
+}
+
+/**
+ * 4. Video Block Content
+ * YouTube video embed using privacy-friendly youtube-nocookie.com domain.
+ */
+export type VideoBlockContent = {
+  video_id: string // 11-character YouTube video ID
+  original_url: string
+  title?: string | null
+  start_seconds?: number | null
+}
+
+/**
+ * 5. Link Button Block Content
+ * Action button opening external resource in a new tab.
+ * Note: 'required' flag is stored on the course_blocks.required boolean column.
+ */
+export type LinkBlockContent = {
+  url: string // http:// or https:// only
+  label: string
+  description?: string | null
+}
+
+export type CourseBlockContent =
+  | RichTextBlockContent
+  | ImageTextBlockContent
+  | ImageBlockContent
+  | VideoBlockContent
+  | LinkBlockContent
+
 export type CourseBlock = {
   id: string
   lesson_id: string
   position: number
   type: CourseBlockType
-  content: Record<string, unknown>
+  content: Record<string, unknown> // Shape conforms to CourseBlockContent
   required: boolean
   created_at: string
   updated_at: string
