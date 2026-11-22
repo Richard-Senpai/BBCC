@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   BookOpen,
   ChevronUp,
@@ -14,9 +15,13 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Copy,
+  Layers,
+  Clock,
+  Sparkles,
 } from 'lucide-react'
-import { saveChallengeDay, getChallengeDay } from '@/lib/actions/admin'
-import type { ChallengeDayWithActivities, DayCompletionCount } from '@/lib/types'
+import { saveChallengeDay, getChallengeDay, copyChallengeDays } from '@/lib/actions/admin'
+import type { ChallengeDayWithActivities, DayCompletionCount, ChallengeWithStats, ChallengeStatus } from '@/lib/types'
 
 interface ActivityItem {
   id?: string
@@ -41,6 +46,9 @@ interface CurriculumArchitectProps {
   startDate: string | null
   durationDays?: number
   challengeName?: string
+  challengeId?: string
+  challenges?: ChallengeWithStats[]
+  challengeStatus?: ChallengeStatus
 }
 
 function isValidUrl(val: string): boolean {
@@ -73,7 +81,18 @@ export default function CurriculumArchitect({
   startDate,
   durationDays = 40,
   challengeName = 'Overcomer',
+  challengeId,
+  challenges = [],
+  challengeStatus,
 }: CurriculumArchitectProps) {
+  const router = useRouter()
+
+  // ── Challenge Selector & Copy State ─────────────────────────
+  const [showCopyModal, setShowCopyModal] = useState(false)
+  const [selectedSourceId, setSelectedSourceId] = useState('')
+  const [isCopying, startCopyTransition] = useTransition()
+  const [copyMsg, setCopyMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // ── 1. Local Cache of all Days ─────────────────────────────
   // Initialized from server-passed days; updated immediately on edit and on save.
   const [daysCache, setDaysCache] = useState<Map<number, DayData>>(() => {
@@ -96,6 +115,37 @@ export default function CurriculumArchitect({
     })
     return map
   })
+
+  // Synchronize cache whenever initialDays or challengeId changes
+  useEffect(() => {
+    const map = new Map<number, DayData>()
+    initialDays.forEach((d) => {
+      map.set(d.day_number, {
+        id: d.id,
+        day_number: d.day_number,
+        title: d.title,
+        description: d.description ?? '',
+        scripture_reference: d.scripture_reference ?? 'Galatians 5:16-25 & Romans 8:1-14',
+        activities: (d.activities ?? []).map((a) => ({
+          id: a.id,
+          challenge_day_id: a.challenge_day_id,
+          description: a.description,
+          sort_order: a.sort_order,
+          video_url: a.video_url ?? '',
+        })),
+      })
+    })
+    setDaysCache(map)
+    setSelectedDayNum(1)
+    const day1 = map.get(1) ?? getDefaultDayData(1, durationDays, challengeName)
+    setTitle(day1.title)
+    setScripture(day1.scripture_reference)
+    setDescription(day1.description)
+    setActivities(day1.activities)
+    setIsDirty(false)
+    setSaveStatus('saved')
+    setFeedback(null)
+  }, [initialDays, challengeId, durationDays, challengeName])
 
   // Completion counts map
   const countMap = new Map<number, number>()
@@ -168,10 +218,22 @@ export default function CurriculumArchitect({
         }
       }
 
+      // Explicit confirmation if challenge is marked completed
+      if (challengeStatus === 'completed') {
+        const proceed = window.confirm(
+          `NOTICE: "${challengeName}" is marked as COMPLETED and remains accessible to church members as their historical devotional record.\n\nModifying Day ${dayNum} will immediately alter what members see in their completed archives.\n\nAre you sure you want to proceed with saving changes to this completed challenge?`
+        )
+        if (!proceed) {
+          setSaveStatus('saved')
+          return false
+        }
+      }
+
       setSaveStatus('saving')
 
       try {
         const result = await saveChallengeDay({
+          challengeId,
           dayNumber: dayNum,
           title: snapshot.title,
           description: snapshot.description,
@@ -231,7 +293,7 @@ export default function CurriculumArchitect({
         return false
       }
     },
-    []
+    [challengeId, challengeStatus, challengeName]
   )
 
   // ── 4. Day Switching (Auto-save on switch + Fetch ground truth) ─
@@ -268,7 +330,7 @@ export default function CurriculumArchitect({
 
       // Step C: Fetch fresh ground truth from DB in background to ensure video links & latest DB updates
       try {
-        const dbDay = await getChallengeDay(targetDayNum)
+        const dbDay = await getChallengeDay(targetDayNum, challengeId)
         if (dbDay) {
           const freshData: DayData = {
             id: dbDay.id,
@@ -304,7 +366,7 @@ export default function CurriculumArchitect({
         console.warn(`Could not re-fetch Day ${targetDayNum} from DB:`, fetchErr)
       }
     },
-    [selectedDayNum, isDirty, daysCache, durationDays, challengeName, executeSave]
+    [selectedDayNum, isDirty, daysCache, durationDays, challengeName, challengeId, executeSave]
   )
 
   // ── 5. Field Update Handlers ───────────────────────────────
@@ -380,6 +442,14 @@ export default function CurriculumArchitect({
     e.preventDefault()
     setFeedback(null)
 
+    // Explicit confirmation if challenge is marked completed
+    if (challengeStatus === 'completed') {
+      const proceed = window.confirm(
+        `NOTICE: "${challengeName}" is marked as COMPLETED and remains accessible to church members as their historical devotional record.\n\nModifying Day ${selectedDayNum} will immediately alter what members see in their completed archives.\n\nAre you sure you want to proceed with saving changes to this completed challenge?`
+      )
+      if (!proceed) return
+    }
+
     startTransition(async () => {
       const currentSnapshot = {
         day_number: selectedDayNum,
@@ -396,6 +466,40 @@ export default function CurriculumArchitect({
         })
       }
     })
+  }
+
+  // ── 7. Copy Days From Previous Challenge ───────────────────
+  function handleCopyFromChallenge() {
+    if (!selectedSourceId) return
+    const sourceObj = challenges.find((c) => c.id === selectedSourceId)
+    const sourceName = sourceObj?.name || 'the selected challenge'
+
+    const confirmed = window.confirm(
+      `COPY CURRICULUM CONFIRMATION:\n\nThis will copy all days and activities from "${sourceName}" into "${challengeName}" (up to Day ${durationDays}).\n\nExisting day slots will be overwritten with the copied content.\n\nAre you sure you want to proceed?`
+    )
+    if (!confirmed) return
+
+    if (!challengeId) return
+    setCopyMsg(null)
+
+    startCopyTransition(async () => {
+      const res = await copyChallengeDays(selectedSourceId, challengeId)
+      if (!res.success) {
+        setCopyMsg({ type: 'error', text: res.error || 'Failed to copy challenge days' })
+      } else {
+        setCopyMsg({
+          type: 'success',
+          text: `Successfully copied ${res.copiedCount ?? 0} days from "${sourceName}"!`,
+        })
+        setShowCopyModal(false)
+        router.refresh()
+      }
+    })
+  }
+
+  function handleChallengeSelect(newId: string) {
+    if (newId === challengeId) return
+    router.push(`/admin?challenge=${newId}#curriculum-architect`)
   }
 
   // Target date calculation
@@ -417,7 +521,74 @@ export default function CurriculumArchitect({
   ).length
 
   return (
-    <section className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors">
+    <section id="curriculum-architect" className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors">
+      {/* ── Challenge Scope Bar ── */}
+      {challenges.length > 0 && (
+        <div className="mb-5 pb-4 border-b border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider flex items-center gap-1.5">
+              <Layers size={14} className="text-[var(--flame-accent)]" />
+              <span>Editing Challenge:</span>
+            </span>
+            <select
+              value={challengeId || ''}
+              onChange={(e) => handleChallengeSelect(e.target.value)}
+              className="px-3 py-1.5 text-xs font-semibold bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition shadow-2xs cursor-pointer"
+            >
+              {challenges.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.status.toUpperCase()} — {c.duration_days} Days)
+                </option>
+              ))}
+            </select>
+
+            {challengeStatus === 'active' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                Active
+              </span>
+            )}
+            {challengeStatus === 'upcoming' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                <Clock size={11} strokeWidth={2} />
+                Upcoming
+              </span>
+            )}
+            {challengeStatus === 'completed' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-hairline)]">
+                <CheckCircle2 size={11} strokeWidth={2} />
+                Completed (Historical Archive)
+              </span>
+            )}
+          </div>
+
+          {challenges.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                const other = challenges.filter((c) => c.id !== challengeId)
+                if (other.length > 0) setSelectedSourceId(other[0].id)
+                setShowCopyModal(true)
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-ink)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-hairline)] rounded-lg shadow-2xs transition cursor-pointer self-start sm:self-auto"
+            >
+              <Copy size={13} strokeWidth={1.75} className="text-[var(--flame-accent)]" />
+              <span>Copy Days from Previous Challenge</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Warning when modifying completed challenge */}
+      {challengeStatus === 'completed' && (
+        <div className="mb-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+          <AlertCircle size={15} className="shrink-0" />
+          <p>
+            <strong>Historical Challenge Notice:</strong> &ldquo;{challengeName}&rdquo; is finished and marked completed. Members can review their past milestones here. Any day edits require explicit confirmation to preserve historical record integrity.
+          </p>
+        </div>
+      )}
+
       {/* Title & Legend */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[var(--border-hairline)] gap-2">
         <div className="flex items-center gap-2">
@@ -777,6 +948,92 @@ export default function CurriculumArchitect({
           </form>
         </div>
       </div>
+
+      {/* ── Copy Days Modal ────────────────────────────────────── */}
+      {showCopyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-[var(--bg-surface)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-xl p-6 transition-colors">
+            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[var(--border-hairline)]">
+              <div className="w-8 h-8 rounded-lg bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center border border-[var(--border-hairline)]">
+                <Copy size={16} strokeWidth={1.75} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-ink)]">
+                  Copy Days &amp; Activities
+                </h3>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Pre-fill &ldquo;{challengeName}&rdquo; from another challenge.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-ink)] mb-1.5">
+                  Select Source Challenge
+                </label>
+                <select
+                  value={selectedSourceId}
+                  onChange={(e) => setSelectedSourceId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-medium bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-xl focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition cursor-pointer shadow-xs"
+                >
+                  {challenges
+                    .filter((c) => c.id !== challengeId)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.status.toUpperCase()} — {c.duration_days} Days)
+                      </option>
+                    ))}
+                </select>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                  Will copy day titles, scripture references, summaries, and activity checklists up to Day {durationDays}.
+                </p>
+              </div>
+
+              {copyMsg && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-medium ${
+                    copyMsg.type === 'error'
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                  }`}
+                >
+                  {copyMsg.text}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[var(--border-hairline)]">
+                <button
+                  type="button"
+                  onClick={() => setShowCopyModal(false)}
+                  disabled={isCopying}
+                  className="px-3.5 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-ink)] rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyFromChallenge}
+                  disabled={isCopying || !selectedSourceId}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-[var(--flame-accent)] hover:opacity-95 disabled:opacity-50 rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {isCopying ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Copying Content…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={13} strokeWidth={2} />
+                      <span>Copy Days into {challengeName}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

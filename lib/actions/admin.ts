@@ -2,7 +2,27 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { Profile } from '@/lib/types'
+import type {
+  Profile,
+  Challenge,
+  ChallengeStatus,
+  ChallengeWithStats,
+  ChallengeDayWithActivities,
+} from '@/lib/types'
+
+function checkDateOverlap(
+  startA: string,
+  durationA: number,
+  startB: string,
+  durationB: number
+): boolean {
+  const sA = new Date(startA + 'T00:00:00Z').getTime()
+  const eA = sA + (durationA - 1) * 86400000
+  const sB = new Date(startB + 'T00:00:00Z').getTime()
+  const eB = sB + (durationB - 1) * 86400000
+
+  return !(eA < sB || sA > eB)
+}
 
 async function assertAdmin() {
   const supabase = await createClient()
@@ -27,7 +47,393 @@ async function assertAdmin() {
 }
 
 /**
- * Update challenge start date and timezone.
+ * Fetch all challenges with derived statuses and unique participant counts.
+ * Participant count: Members who completed at least one activity in that challenge.
+ */
+export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    const { data: challenges, error } = await supabase
+      .from('challenges')
+      .select('*')
+      .order('start_date', { ascending: false })
+
+    if (error || !challenges) {
+      console.error('[getAdminChallenges] Error:', error)
+      return []
+    }
+
+    const results: ChallengeWithStats[] = await Promise.all(
+      challenges.map(async (c) => {
+        const startDate = c.start_date
+        const duration = c.duration_days
+        const tz = c.timezone || 'Africa/Lagos'
+
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+        const startStr = startDate
+        const endDateTime = new Date(new Date(startDate + 'T00:00:00Z').getTime() + (duration - 1) * 86400000)
+        const endStr = endDateTime.toISOString().split('T')[0]
+
+        let status: ChallengeStatus = 'upcoming'
+        let currentDay = 0
+
+        if (todayStr < startStr) {
+          status = 'upcoming'
+          currentDay = 0
+        } else if (todayStr > endStr) {
+          status = 'completed'
+          currentDay = duration + 1
+        } else {
+          status = 'active'
+          const diffDays = Math.floor(
+            (new Date(todayStr + 'T00:00:00Z').getTime() - new Date(startStr + 'T00:00:00Z').getTime()) /
+              86400000
+          )
+          currentDay = diffDays + 1
+        }
+
+        const { data: cDays } = await supabase
+          .from('challenge_days')
+          .select('id, activities(id)')
+          .eq('challenge_id', c.id)
+
+        let participantCount = 0
+        if (cDays && cDays.length > 0) {
+          const actIds: string[] = []
+          for (const d of cDays) {
+            for (const a of (d.activities as { id: string }[] ?? [])) {
+              actIds.push(a.id)
+            }
+          }
+
+          if (actIds.length > 0) {
+            const { data: compRows } = await supabase
+              .from('activity_completions')
+              .select('user_id')
+              .in('activity_id', actIds)
+
+            if (compRows) {
+              const uniqueUsers = new Set(compRows.map((r) => r.user_id))
+              participantCount = uniqueUsers.size
+            }
+          }
+        }
+
+        return {
+          ...c,
+          status,
+          current_day: currentDay,
+          end_date: endStr,
+          participant_count: participantCount,
+        }
+      })
+    )
+
+    return results
+  } catch (err) {
+    console.error('[getAdminChallenges] Unexpected error:', err)
+    return []
+  }
+}
+
+/**
+ * Create a new challenge.
+ * Validates that date ranges do not overlap an existing challenge.
+ * Automatically generates day slots 1 to N with default templates and activities.
+ */
+export async function createChallenge(params: {
+  name: string
+  durationDays: number
+  startDate: string
+  timezone?: string
+}): Promise<{
+  success: boolean
+  error?: string
+  challengeId?: string
+}> {
+  try {
+    const { supabase } = await assertAdmin()
+    const name = params.name.trim()
+    const durationDays = Number(params.durationDays)
+    const startDate = params.startDate.trim()
+    const timezone = params.timezone?.trim() || 'Africa/Lagos'
+
+    if (!name) return { success: false, error: 'Challenge name cannot be empty.' }
+    if (isNaN(durationDays) || durationDays < 1 || durationDays > 365) {
+      return { success: false, error: 'Duration must be between 1 and 365 days.' }
+    }
+    if (!startDate || isNaN(new Date(startDate).getTime())) {
+      return { success: false, error: 'Please specify a valid start date.' }
+    }
+
+    // 1. Check overlap with all existing challenges
+    const { data: existingChallenges, error: fetchErr } = await supabase
+      .from('challenges')
+      .select('id, name, duration_days, start_date')
+
+    if (fetchErr) {
+      console.error('[createChallenge] Error fetching existing challenges:', fetchErr)
+    }
+
+    if (existingChallenges && existingChallenges.length > 0) {
+      for (const ec of existingChallenges) {
+        if (checkDateOverlap(startDate, durationDays, ec.start_date, ec.duration_days)) {
+          const ecEndDate = new Date(
+            new Date(ec.start_date + 'T00:00:00Z').getTime() + (ec.duration_days - 1) * 86400000
+          )
+            .toISOString()
+            .split('T')[0]
+          return {
+            success: false,
+            error: `Challenge dates overlap with existing challenge "${ec.name}" (${ec.start_date} to ${ecEndDate}). Challenges cannot overlap in dates.`,
+          }
+        }
+      }
+    }
+
+    // 2. Insert new challenge
+    const { data: newChallenge, error: insertErr } = await supabase
+      .from('challenges')
+      .insert({
+        name,
+        duration_days: durationDays,
+        start_date: startDate,
+        timezone,
+      })
+      .select('id')
+      .single()
+
+    if (insertErr || !newChallenge) {
+      return { success: false, error: insertErr?.message || 'Failed to create challenge' }
+    }
+
+    const challengeId = newChallenge.id
+
+    // 3. Generate day slots 1 to N with default templates and 3 default activities
+    for (let i = 1; i <= durationDays; i++) {
+      const { data: dayRow, error: dayError } = await supabase
+        .from('challenge_days')
+        .insert({
+          challenge_id: challengeId,
+          day_number: i,
+          title: `Day ${i}: Consecration & Spiritual Discipline`,
+          description: `Daily devotional focus and prayer alignment for Day ${i} of the ${durationDays} Days of ${name} Challenge.`,
+          scripture_reference: 'Galatians 5:16-25 & Romans 8:1-14',
+        })
+        .select('id')
+        .single()
+
+      if (dayError) {
+        console.error(`[createChallenge] Error generating day ${i}:`, dayError)
+      } else if (dayRow) {
+        await supabase.from('activities').insert([
+          {
+            challenge_day_id: dayRow.id,
+            description: 'Morning Prayer Watch (30 mins personal devotion)',
+            sort_order: 1,
+          },
+          {
+            challenge_day_id: dayRow.id,
+            description: 'Scripture Meditation & Journaling',
+            sort_order: 2,
+          },
+          {
+            challenge_day_id: dayRow.id,
+            description: 'Midday Fasting & Fellowship Consecration',
+            sort_order: 3,
+          },
+        ])
+      }
+    }
+
+    revalidatePath('/admin')
+    revalidatePath('/admin/analytics')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/progress')
+    revalidatePath('/leaderboard')
+
+    return { success: true, challengeId }
+  } catch (err) {
+    console.error('[createChallenge] Error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to create challenge',
+    }
+  }
+}
+
+/**
+ * Copy days and activities from a previous challenge into a target challenge.
+ * Pre-fills the new challenge up to its duration_days.
+ */
+export async function copyChallengeDays(
+  sourceChallengeId: string,
+  targetChallengeId: string
+): Promise<{ success: boolean; error?: string; copiedCount?: number }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // 1. Fetch source days and activities
+    const { data: sourceDays, error: srcErr } = await supabase
+      .from('challenge_days')
+      .select('id, day_number, title, description, scripture_reference, activities(description, sort_order, video_url)')
+      .eq('challenge_id', sourceChallengeId)
+      .order('day_number', { ascending: true })
+
+    if (srcErr || !sourceDays || sourceDays.length === 0) {
+      return { success: false, error: 'Source challenge has no days to copy.' }
+    }
+
+    // 2. Fetch target challenge to verify duration
+    const { data: targetChallenge, error: targetErr } = await supabase
+      .from('challenges')
+      .select('id, duration_days')
+      .eq('id', targetChallengeId)
+      .single()
+
+    if (targetErr || !targetChallenge) {
+      return { success: false, error: 'Target challenge not found.' }
+    }
+
+    let copied = 0
+
+    // 3. For each day up to target duration, copy content
+    for (const sDay of sourceDays) {
+      if (sDay.day_number > targetChallenge.duration_days) continue
+
+      const { data: targetDay, error: dayErr } = await supabase
+        .from('challenge_days')
+        .upsert(
+          {
+            challenge_id: targetChallengeId,
+            day_number: sDay.day_number,
+            title: sDay.title,
+            description: sDay.description,
+            scripture_reference: sDay.scripture_reference,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'challenge_id,day_number' }
+        )
+        .select('id')
+        .single()
+
+      if (dayErr || !targetDay) {
+        console.error(`[copyChallengeDays] Day ${sDay.day_number} error:`, dayErr)
+        continue
+      }
+
+      // Delete existing activities for targetDay
+      await supabase.from('activities').delete().eq('challenge_day_id', targetDay.id)
+
+      // Copy activities
+      const actsToInsert = (sDay.activities as { description: string; sort_order: number; video_url?: string | null }[] ?? []).map((a) => ({
+        challenge_day_id: targetDay.id,
+        description: a.description,
+        sort_order: a.sort_order,
+        video_url: a.video_url || null,
+      }))
+
+      if (actsToInsert.length > 0) {
+        await supabase.from('activities').insert(actsToInsert)
+      }
+
+      copied++
+    }
+
+    revalidatePath('/admin')
+    return { success: true, copiedCount: copied }
+  } catch (err) {
+    console.error('[copyChallengeDays] Error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to copy challenge days',
+    }
+  }
+}
+
+/**
+ * Update challenge details (name, duration, start date, timezone).
+ * Validates date range does not overlap another challenge.
+ */
+export async function updateChallenge(
+  challengeId: string,
+  params: {
+    name: string
+    durationDays: number
+    startDate: string
+    timezone?: string
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+    const name = params.name.trim()
+    const durationDays = Number(params.durationDays)
+    const startDate = params.startDate.trim()
+    const timezone = params.timezone?.trim() || 'Africa/Lagos'
+
+    if (!name) return { success: false, error: 'Challenge name cannot be empty.' }
+    if (isNaN(durationDays) || durationDays < 1 || durationDays > 365) {
+      return { success: false, error: 'Duration must be between 1 and 365 days.' }
+    }
+    if (!startDate || isNaN(new Date(startDate).getTime())) {
+      return { success: false, error: 'Please specify a valid start date.' }
+    }
+
+    // Check overlap with other challenges
+    const { data: otherChallenges } = await supabase
+      .from('challenges')
+      .select('id, name, duration_days, start_date')
+      .neq('id', challengeId)
+
+    if (otherChallenges && otherChallenges.length > 0) {
+      for (const oc of otherChallenges) {
+        if (checkDateOverlap(startDate, durationDays, oc.start_date, oc.duration_days)) {
+          const ocEndDate = new Date(
+            new Date(oc.start_date + 'T00:00:00Z').getTime() + (oc.duration_days - 1) * 86400000
+          )
+            .toISOString()
+            .split('T')[0]
+          return {
+            success: false,
+            error: `Challenge dates overlap with existing challenge "${oc.name}" (${oc.start_date} to ${ocEndDate}). Challenges cannot overlap in dates.`,
+          }
+        }
+      }
+    }
+
+    const { error: updErr } = await supabase
+      .from('challenges')
+      .update({
+        name,
+        duration_days: durationDays,
+        start_date: startDate,
+        timezone,
+      })
+      .eq('id', challengeId)
+
+    if (updErr) {
+      return { success: false, error: updErr.message }
+    }
+
+    revalidatePath('/admin')
+    revalidatePath('/admin/analytics')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/progress')
+    revalidatePath('/leaderboard')
+
+    return { success: true }
+  } catch (err) {
+    console.error('[updateChallenge] Error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update challenge',
+    }
+  }
+}
+
+/**
+ * Update challenge start date and timezone (legacy / backwards compatibility).
  * Shifts universal day calculation for all members.
  */
 export async function updateChallengeSettings(
@@ -92,6 +498,7 @@ function isValidHttpUrl(urlString: string): boolean {
  * Save day content and its associated activities.
  */
 export async function saveChallengeDay(params: {
+  challengeId?: string
   dayNumber: number
   title: string
   description: string
@@ -103,6 +510,7 @@ export async function saveChallengeDay(params: {
   dayId?: string
   day?: {
     id: string
+    challenge_id?: string
     day_number: number
     title: string
     description: string | null
@@ -112,7 +520,7 @@ export async function saveChallengeDay(params: {
 }> {
   try {
     const { supabase } = await assertAdmin()
-    const { dayNumber, title, description, scriptureReference, activities } = params
+    const { challengeId, dayNumber, title, description, scriptureReference, activities } = params
 
     if (!title || !title.trim()) {
       return { success: false, error: 'Challenge day title cannot be empty.' }
@@ -130,18 +538,35 @@ export async function saveChallengeDay(params: {
       }
     }
 
+    // Resolve target challenge ID
+    let targetChallengeId = challengeId
+    if (!targetChallengeId) {
+      const { data: c } = await supabase
+        .from('challenges')
+        .select('id')
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      targetChallengeId = c?.id
+    }
+
     // 1. Upsert challenge_day
+    const upsertPayload: Record<string, unknown> = {
+      day_number: dayNumber,
+      title: title.trim(),
+      description: description.trim() || null,
+      scripture_reference: scriptureReference.trim(),
+      updated_at: new Date().toISOString(),
+    }
+    if (targetChallengeId) {
+      upsertPayload.challenge_id = targetChallengeId
+    }
+
     const { data: dayRow, error: dayError } = await supabase
       .from('challenge_days')
       .upsert(
-        {
-          day_number: dayNumber,
-          title: title.trim(),
-          description: description.trim() || null,
-          scripture_reference: scriptureReference.trim(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'day_number' }
+        upsertPayload as any,
+        { onConflict: targetChallengeId ? 'challenge_id,day_number' : 'day_number' }
       )
       .select('id')
       .single()
@@ -234,6 +659,7 @@ export async function saveChallengeDay(params: {
       dayId,
       day: {
         id: dayId,
+        challenge_id: targetChallengeId,
         day_number: dayNumber,
         title: title.trim(),
         description: description.trim() || null,
@@ -260,15 +686,20 @@ export async function saveChallengeDay(params: {
  * Fetch a single challenge day and its activities directly from the database.
  * Used by CurriculumArchitect when switching days to guarantee fresh data.
  */
-export async function getChallengeDay(dayNumber: number) {
+export async function getChallengeDay(dayNumber: number, challengeId?: string) {
   try {
     const { supabase } = await assertAdmin()
 
-    const { data: dayRow, error } = await supabase
+    let query = supabase
       .from('challenge_days')
-      .select('id, day_number, title, description, scripture_reference, activities(id, challenge_day_id, description, sort_order, video_url)')
+      .select('id, challenge_id, day_number, title, description, scripture_reference, activities(id, challenge_day_id, description, sort_order, video_url)')
       .eq('day_number', dayNumber)
-      .maybeSingle()
+
+    if (challengeId) {
+      query = query.eq('challenge_id', challengeId)
+    }
+
+    const { data: dayRow, error } = await query.maybeSingle()
 
     if (error) {
       console.error('[getChallengeDay] Database error:', error)
@@ -279,7 +710,7 @@ export async function getChallengeDay(dayNumber: number) {
 
     return {
       ...dayRow,
-      activities: (dayRow.activities ?? []).sort((a, b) => a.sort_order - b.sort_order),
+      activities: ((dayRow.activities as { id: string; challenge_day_id: string; description: string; sort_order: number; video_url?: string | null }[]) ?? []).sort((a, b) => a.sort_order - b.sort_order),
     }
   } catch (err) {
     console.error('[getChallengeDay] Error:', err)

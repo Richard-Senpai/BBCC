@@ -9,9 +9,17 @@ import AnalyticsDashboard, {
   type MemberAnalyticsItem,
   type DayDetail,
 } from '@/components/admin/AnalyticsDashboard'
+import { getAdminChallenges } from '@/lib/actions/admin'
 import type { ChallengeSettings, Profile } from '@/lib/types'
 
-export default async function AdminAnalyticsPage() {
+interface AdminAnalyticsPageProps {
+  searchParams?: Promise<{
+    challenge?: string
+  }>
+}
+
+export default async function AdminAnalyticsPage({ searchParams }: AdminAnalyticsPageProps) {
+  const resolvedParams = searchParams ? await searchParams : {}
   const supabase = await createClient()
 
   const {
@@ -30,6 +38,24 @@ export default async function AdminAnalyticsPage() {
     redirect('/dashboard')
   }
 
+  // Fetch all challenges first
+  const adminChallenges = await getAdminChallenges()
+
+  let selectedChallenge = adminChallenges.find((c) => c.id === resolvedParams.challenge)
+  if (!selectedChallenge) {
+    selectedChallenge = adminChallenges.find((c) => c.status === 'active') || adminChallenges[0] || null
+  }
+  const targetChallengeId = selectedChallenge?.id
+
+  let daysQuery = supabase
+    .from('challenge_days')
+    .select('id, challenge_id, day_number, title, description, activities(id, challenge_day_id, description, sort_order, video_url)')
+    .order('day_number', { ascending: true })
+
+  if (targetChallengeId) {
+    daysQuery = daysQuery.eq('challenge_id', targetChallengeId)
+  }
+
   // Parallel fetches for analytics
   const [
     settingsRes,
@@ -40,10 +66,7 @@ export default async function AdminAnalyticsPage() {
     currentDayRes,
   ] = await Promise.all([
     supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-    supabase
-      .from('challenge_days')
-      .select('id, day_number, title, description, activities(id, challenge_day_id, description, sort_order, video_url)')
-      .order('day_number', { ascending: true }),
+    daysQuery,
     supabase
       .from('profiles')
       .select('*')
@@ -55,12 +78,14 @@ export default async function AdminAnalyticsPage() {
     supabase
       .from('completions')
       .select('id, user_id, challenge_day_id, completed_at'),
-    supabase.rpc('get_current_challenge_day'),
+    targetChallengeId
+      ? supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
+      : supabase.rpc('get_current_challenge_day'),
   ])
 
   const settings: ChallengeSettings | null = settingsRes.data
-  const durationDays = settings?.duration_days ?? 40
-  const challengeName = settings?.challenge_name ?? 'Overcomer'
+  const durationDays = selectedChallenge?.duration_days ?? settings?.duration_days ?? 40
+  const challengeName = selectedChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
 
   const rawDays = daysRes.data ?? []
@@ -72,11 +97,18 @@ export default async function AdminAnalyticsPage() {
     activities: (d.activities ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order),
   }))
 
-  const members: Profile[] = membersRes.data ?? []
-  const allActivityCompletions = activityCompletionsRes.data ?? []
-  const allDayCompletions = dayCompletionsRes.data ?? []
+  const validDayIds = new Set(days.map((d) => d.id))
+  const validActIds = new Set(days.flatMap((d) => (d.activities ?? []).map((a) => a.id)))
 
-  // Compile per-member metrics with stats
+  const members: Profile[] = membersRes.data ?? []
+  const allActivityCompletions = (activityCompletionsRes.data ?? []).filter((ac) =>
+    validActIds.size > 0 ? validActIds.has(ac.activity_id) : true
+  )
+  const allDayCompletions = (dayCompletionsRes.data ?? []).filter((c) =>
+    validDayIds.size > 0 ? validDayIds.has(c.challenge_day_id) : true
+  )
+
+  // Compile per-member metrics with stats scoped to targetChallengeId
   const memberItems: MemberAnalyticsItem[] = await Promise.all(
     members.map(async (m) => {
       const userActComps = allActivityCompletions.filter((ac) => ac.user_id === m.id)
@@ -93,7 +125,10 @@ export default async function AdminAnalyticsPage() {
         (a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
       )[0]
 
-      const statsRes = await supabase.rpc('get_member_stats', { member_id: m.id })
+      const statsRes = targetChallengeId
+        ? await supabase.rpc('get_member_stats', { member_id: m.id, target_challenge_id: targetChallengeId })
+        : await supabase.rpc('get_member_stats', { member_id: m.id })
+
       const stats = (statsRes.data as { current_streak: number; longest_run: number }[] | null)?.[0] ?? {
         current_streak: 0,
         longest_run: 0,
@@ -166,6 +201,8 @@ export default async function AdminAnalyticsPage() {
           durationDays={durationDays}
           challengeName={challengeName}
           currentDay={currentDay}
+          challenges={adminChallenges}
+          selectedChallengeId={targetChallengeId}
         />
       </div>
     </main>

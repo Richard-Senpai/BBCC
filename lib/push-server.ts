@@ -172,8 +172,9 @@ export async function sendPushToUsers(
 }
 
 /**
- * Idempotently check if current challenge day has changed,
+ * Idempotently check if current challenge day has changed for the currently ACTIVE challenge,
  * and dispatch new day push notifications to all approved members with new_day_enabled.
+ * If no challenge is active (between challenges), exits cleanly without error or notifications.
  */
 export async function checkAndDispatchNewDayPush(options?: { force?: boolean }): Promise<{
   success: boolean
@@ -185,63 +186,97 @@ export async function checkAndDispatchNewDayPush(options?: { force?: boolean }):
   try {
     const supabase = await createClient()
 
-    // 1. Fetch current settings and day
-    const [settingsRes, currentDayRes] = await Promise.all([
-      supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-      supabase.rpc('get_current_challenge_day'),
-    ])
+    // 1. Fetch challenges to find the currently ACTIVE challenge
+    const { data: challenges, error: chalErr } = await supabase
+      .from('challenges')
+      .select('*')
+      .order('start_date', { ascending: false })
 
-    const settings = settingsRes.data
-    const currentDay = (currentDayRes.data as number) ?? 0
-
-    if (!settings) {
-      return { success: false, reason: 'Challenge settings row not found' }
+    if (chalErr || !challenges || challenges.length === 0) {
+      // Fallback check against challenge_settings if challenges table not yet migrated
+      const { data: settings } = await supabase.from('challenge_settings').select('*').eq('id', 1).single()
+      if (!settings || !settings.start_date) {
+        return { success: true, skipped: true, reason: 'No active challenge found' }
+      }
+      return { success: true, skipped: true, reason: 'No active challenge found in challenges table' }
     }
 
-    if (currentDay <= 0) {
-      return { success: true, skipped: true, reason: 'Challenge has not started yet (Day 0)' }
+    const now = new Date()
+    const activeChallenge = challenges.find((c) => {
+      const tz = c.timezone || 'Africa/Lagos'
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now)
+      const startStr = c.start_date
+      const endDateTime = new Date(new Date(c.start_date + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000)
+      const endStr = endDateTime.toISOString().split('T')[0]
+      return todayStr >= startStr && todayStr <= endStr
+    })
+
+    if (!activeChallenge) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'Between challenges: No challenge is currently active',
+      }
     }
 
-    const durationDays = settings.duration_days ?? 40
-    if (currentDay > durationDays) {
-      return { success: true, skipped: true, reason: `Challenge complete (Day ${currentDay} > ${durationDays})` }
+    const tz = activeChallenge.timezone || 'Africa/Lagos'
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now)
+    const diffDays = Math.floor(
+      (new Date(todayStr + 'T00:00:00Z').getTime() - new Date(activeChallenge.start_date + 'T00:00:00Z').getTime()) /
+        86400000
+    )
+    const currentDay = diffDays + 1
+
+    if (currentDay <= 0 || currentDay > activeChallenge.duration_days) {
+      return {
+        success: true,
+        skipped: true,
+        reason: `Current day ${currentDay} out of active range 1..${activeChallenge.duration_days}`,
+      }
     }
 
-    const lastNotified = settings.last_notified_challenge_day ?? 0
+    const lastNotified = activeChallenge.last_notified_challenge_day ?? 0
 
     // Idempotency: skip if already notified for this day unless force=true
     if (!options?.force && currentDay <= lastNotified) {
       return {
         success: true,
         skipped: true,
-        reason: `Day ${currentDay} was already notified (last_notified_challenge_day: ${lastNotified})`,
+        reason: `Day ${currentDay} of "${activeChallenge.name}" was already notified (last_notified: ${lastNotified})`,
         currentDay,
       }
     }
 
-    // 2. Fetch Day metadata (title, scripture reference)
+    // 2. Fetch Day metadata (title, scripture reference) for this active challenge
     const { data: dayData } = await supabase
       .from('challenge_days')
       .select('title, scripture_reference')
+      .eq('challenge_id', activeChallenge.id)
       .eq('day_number', currentDay)
       .maybeSingle()
 
-    const challengeName = settings.challenge_name || 'Overcomer'
+    const challengeName = activeChallenge.name || 'Challenge'
     const dayTitle = dayData?.title ? `: ${dayData.title}` : ''
     const scripture = dayData?.scripture_reference ? ` (${dayData.scripture_reference})` : ''
 
     const notificationTitle = `Day ${currentDay} is Live! | ${challengeName}`
     const notificationBody = `Today's consecration disciplines are ready${dayTitle}${scripture}. Tap to open today's devotions.`
 
-    // 3. Atomically update last_notified_challenge_day to currentDay
+    // 3. Atomically update last_notified_challenge_day on the active challenge
     const { error: updateError } = await supabase
+      .from('challenges')
+      .update({ last_notified_challenge_day: currentDay })
+      .eq('id', activeChallenge.id)
+
+    if (updateError) {
+      console.error('[checkAndDispatchNewDayPush] Error updating last_notified_challenge_day on challenges:', updateError)
+    }
+
+    // Also update legacy challenge_settings if row exists
+    await supabase
       .from('challenge_settings')
       .update({ last_notified_challenge_day: currentDay })
       .eq('id', 1)
-
-    if (updateError) {
-      console.error('[checkAndDispatchNewDayPush] Error updating last_notified_challenge_day:', updateError)
-    }
 
     // 4. Query all approved members
     const { data: approvedMembers } = await supabase

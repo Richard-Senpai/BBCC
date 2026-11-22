@@ -15,29 +15,67 @@ export default async function LeaderboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Parallel fetches: current day, settings, leaderboard (top 6 + user rank), and current user profile/stats
-  const [currentDayRes, settingsRes, leaderboardRes, userProfileRes, userStatsRes, userActivitiesRes] =
+  // Fetch settings & challenges to scope leaderboard to active/most recent challenge
+  const [settingsRes, challengesRes] = await Promise.all([
+    supabase.from('challenge_settings').select('*').eq('id', 1).single(),
+    supabase.from('challenges').select('*').order('start_date', { ascending: false }),
+  ])
+
+  const settings = settingsRes.data
+  const allChallenges = challengesRes.data ?? []
+
+  // Resolve active challenge or most recent completed
+  const tz = allChallenges[0]?.timezone || settings?.timezone || 'Africa/Lagos'
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+
+  let targetChallenge = null
+  for (const c of allChallenges) {
+    const sDate = c.start_date
+    const eDate = new Date(new Date(sDate + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000).toISOString().split('T')[0]
+    if (todayStr >= sDate && todayStr <= eDate) {
+      targetChallenge = c
+      break
+    }
+  }
+
+  if (!targetChallenge && allChallenges.length > 0) {
+    targetChallenge = allChallenges[0]
+  }
+
+  const targetChallengeId = targetChallenge?.id
+  const durationDays = targetChallenge?.duration_days ?? settings?.duration_days ?? 40
+  const challengeName = targetChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
+
+  // Parallel fetches: current day, leaderboard (top 6 + user rank), and current user profile/stats
+  const [currentDayRes, leaderboardRes, userProfileRes, userStatsRes, userActivitiesRes] =
     await Promise.all([
-      supabase.rpc('get_current_challenge_day'),
-      supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-      supabase.rpc('get_leaderboard'),
+      targetChallengeId
+        ? supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
+        : supabase.rpc('get_current_challenge_day'),
+      targetChallengeId
+        ? supabase.rpc('get_leaderboard', { target_challenge_id: targetChallengeId })
+        : supabase.rpc('get_leaderboard'),
       user
         ? supabase.from('profiles').select('*').eq('id', user.id).single()
         : Promise.resolve({ data: null }),
       user
-        ? supabase.rpc('get_member_stats', { member_id: user.id })
+        ? (targetChallengeId
+            ? supabase.rpc('get_member_stats', { member_id: user.id, target_challenge_id: targetChallengeId })
+            : supabase.rpc('get_member_stats', { member_id: user.id }))
         : Promise.resolve({ data: null }),
       user
-        ? supabase
-            .from('activity_completions')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
+        ? (targetChallengeId
+            ? supabase
+                .from('activity_completions')
+                .select('activity_id, activities!inner(challenge_days!inner(challenge_id))', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .eq('activities.challenge_days.challenge_id', targetChallengeId)
+            : supabase
+                .from('activity_completions')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id))
         : Promise.resolve({ count: 0 }),
     ])
-
-  const settings = settingsRes.data
-  const durationDays = settings?.duration_days ?? 40
-  const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
 
   const leaderboardRaw = leaderboardRes.data as any

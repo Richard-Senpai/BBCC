@@ -16,7 +16,7 @@ export default async function ProgressPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, settingsRes, currentDayRes, statsRes, completedDaysRes] =
+  const [profileRes, settingsRes, challengesRes] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -28,12 +28,10 @@ export default async function ProgressPage() {
         .select('*')
         .eq('id', 1)
         .single(),
-      supabase.rpc('get_current_challenge_day'),
-      supabase.rpc('get_member_stats', { member_id: user.id }),
       supabase
-        .from('completions')
-        .select('challenge_days!inner(day_number)')
-        .eq('user_id', user.id),
+        .from('challenges')
+        .select('*')
+        .order('start_date', { ascending: false }),
     ])
 
   const profile = profileRes.data as Profile | null
@@ -43,6 +41,44 @@ export default async function ProgressPage() {
   if (!isAdmin && (profile.status === 'pending' || profile.status === 'rejected')) {
     redirect('/pending')
   }
+
+  const settings = settingsRes.data
+  const allChallenges = challengesRes.data ?? []
+
+  // Resolve active challenge or most recent completed
+  const tz = allChallenges[0]?.timezone || settings?.timezone || 'Africa/Lagos'
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+
+  let targetChallenge = null
+  for (const c of allChallenges) {
+    const sDate = c.start_date
+    const eDate = new Date(new Date(sDate + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000).toISOString().split('T')[0]
+    if (todayStr >= sDate && todayStr <= eDate) {
+      targetChallenge = c
+      break
+    }
+  }
+
+  if (!targetChallenge && allChallenges.length > 0) {
+    targetChallenge = allChallenges[0]
+  }
+
+  const targetChallengeId = targetChallenge?.id
+  const durationDays = targetChallenge?.duration_days ?? settings?.duration_days ?? 40
+  const challengeName = targetChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
+
+  const [currentDayRes, statsRes, completedDaysRes] = await Promise.all([
+    targetChallengeId
+      ? supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
+      : supabase.rpc('get_current_challenge_day'),
+    targetChallengeId
+      ? supabase.rpc('get_member_stats', { member_id: user.id, target_challenge_id: targetChallengeId })
+      : supabase.rpc('get_member_stats', { member_id: user.id }),
+    supabase
+      .from('completions')
+      .select('challenge_days!inner(day_number, challenge_id)')
+      .eq('user_id', user.id),
+  ])
 
   // Calculate unread announcements
   let unreadCount = 0
@@ -59,9 +95,6 @@ export default async function ProgressPage() {
     unreadCount = count ?? 0
   }
 
-  const settings = settingsRes.data
-  const durationDays = settings?.duration_days ?? 40
-  const challengeName = settings?.challenge_name ?? 'Overcomer'
   const currentDay = (currentDayRes.data as number) ?? 0
   const stats: MemberStats = (statsRes.data as MemberStats[] | null)?.[0] ?? {
     current_streak: 0,
@@ -71,7 +104,10 @@ export default async function ProgressPage() {
 
   const completedDayNumbers: number[] = (completedDaysRes.data ?? [])
     .map((c: Record<string, unknown>) => {
-      const cd = c.challenge_days as { day_number?: number } | null
+      const cd = c.challenge_days as { day_number?: number; challenge_id?: string } | null
+      if (targetChallengeId && cd?.challenge_id && cd.challenge_id !== targetChallengeId) {
+        return null
+      }
       return cd?.day_number ?? null
     })
     .filter((n): n is number => typeof n === 'number')

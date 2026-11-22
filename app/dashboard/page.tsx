@@ -149,8 +149,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // ── Fetch current logged-in user profile & settings ────────
-  const [profileRes, settingsRes, currentDayRes] = await Promise.all([
+  // ── Fetch current logged-in user profile, settings & challenges ────────
+  const [profileRes, settingsRes, challengesRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('*')
@@ -161,7 +161,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .select('*')
       .eq('id', 1)
       .single(),
-    supabase.rpc('get_current_challenge_day'),
+    supabase
+      .from('challenges')
+      .select('*')
+      .order('start_date', { ascending: false }),
   ])
 
   const profile = profileRes.data
@@ -173,11 +176,36 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const settings = settingsRes.data
-  const currentDay = (currentDayRes.data as number) ?? 0
-  const durationDays = settings?.duration_days ?? 40
-  const challengeName = settings?.challenge_name ?? 'Overcomer'
+  const allChallenges = challengesRes.data ?? []
+
+  // Resolve active challenge or most recent completed
+  const tz = allChallenges[0]?.timezone || settings?.timezone || 'Africa/Lagos'
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+
+  let targetChallenge = null
+  for (const c of allChallenges) {
+    const sDate = c.start_date
+    const eDate = new Date(new Date(sDate + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000).toISOString().split('T')[0]
+    if (todayStr >= sDate && todayStr <= eDate) {
+      targetChallenge = c
+      break
+    }
+  }
+
+  if (!targetChallenge && allChallenges.length > 0) {
+    targetChallenge = allChallenges[0]
+  }
+
+  const targetChallengeId = targetChallenge?.id
+  const durationDays = targetChallenge?.duration_days ?? settings?.duration_days ?? 40
+  const challengeName = targetChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
   const challengeTitle = `${durationDays} Days of ${challengeName}`
-  const timezone = settings?.timezone ?? 'Africa/Lagos'
+  const timezone = targetChallenge?.timezone ?? settings?.timezone ?? 'Africa/Lagos'
+
+  const currentDayRes = targetChallengeId
+    ? await supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
+    : await supabase.rpc('get_current_challenge_day')
+  const currentDay = (currentDayRes.data as number) ?? 0
 
   let effectiveMemberId = user.id
   let displayProfile = profile
@@ -234,21 +262,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   // ── Fetch active day & effective member data in parallel ───
+  let dayQuery = supabase
+    .from('challenge_days')
+    .select('*')
+    .eq('day_number', activeDayNum)
+
+  if (targetChallengeId) {
+    dayQuery = dayQuery.eq('challenge_id', targetChallengeId)
+  }
+
   const [challengeRes, activityCompRes, statsRes, completedDaysRes] =
     await Promise.all([
-      supabase
-        .from('challenge_days')
-        .select('*')
-        .eq('day_number', activeDayNum)
-        .maybeSingle(),
+      dayQuery.maybeSingle(),
       supabase
         .from('activity_completions')
         .select('activity_id')
         .eq('user_id', effectiveMemberId),
-      supabase.rpc('get_member_stats', { member_id: effectiveMemberId }),
+      targetChallengeId
+        ? supabase.rpc('get_member_stats', { member_id: effectiveMemberId, target_challenge_id: targetChallengeId })
+        : supabase.rpc('get_member_stats', { member_id: effectiveMemberId }),
       supabase
         .from('completions')
-        .select('challenge_days!inner(day_number)')
+        .select('challenge_days!inner(day_number, challenge_id)')
         .eq('user_id', effectiveMemberId),
     ])
 
@@ -306,7 +341,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   // Extract completed day numbers for the matrix
   const completedDayNumbers: number[] = (completedDaysRes.data ?? [])
     .map((c: Record<string, unknown>) => {
-      const cd = c.challenge_days as { day_number?: number } | null
+      const cd = c.challenge_days as { day_number?: number; challenge_id?: string } | null
+      if (targetChallengeId && cd?.challenge_id && cd.challenge_id !== targetChallengeId) {
+        return null
+      }
       return cd?.day_number ?? null
     })
     .filter((n): n is number => typeof n === 'number')

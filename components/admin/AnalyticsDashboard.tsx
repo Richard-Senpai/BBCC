@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Search,
@@ -17,9 +18,10 @@ import {
   Eye,
   Check,
   Video,
+  Layers,
 } from 'lucide-react'
 import UserAvatar from '@/components/UserAvatar'
-import { FELLOWSHIP_UNITS } from '@/lib/types'
+import { FELLOWSHIP_UNITS, type ChallengeWithStats } from '@/lib/types'
 
 export interface ActivityDetail {
   id: string
@@ -59,6 +61,8 @@ interface AnalyticsDashboardProps {
   durationDays: number
   challengeName: string
   currentDay: number
+  challenges?: ChallengeWithStats[]
+  selectedChallengeId?: string
 }
 
 function formatDate(isoStr: string | null | undefined): string {
@@ -115,12 +119,20 @@ export default function AnalyticsDashboard({
   durationDays,
   challengeName,
   currentDay,
+  challenges = [],
+  selectedChallengeId,
 }: AnalyticsDashboardProps) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [selectedUnit, setSelectedUnit] = useState('All')
   const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set())
   const [dayScope, setDayScope] = useState<'current' | 'all'>('current')
   const [downloading, setDownloading] = useState<string | null>(null)
+
+  function handleChallengeSelect(id: string) {
+    if (id === selectedChallengeId) return
+    router.push(`/admin/analytics?challenge=${id}`)
+  }
 
   // Filter members
   const filteredMembers = useMemo(() => {
@@ -330,6 +342,33 @@ export default function AnalyticsDashboard({
           </button>
         </div>
       </div>
+
+      {/* ── Challenge Scope Selector ─────────────────────────── */}
+      {challenges && challenges.length > 0 && (
+        <div className="bg-[var(--bg-surface)] rounded-xl p-3.5 border border-[var(--border-hairline)] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider flex items-center gap-1.5">
+              <Layers size={14} className="text-[var(--flame-accent)]" />
+              <span>Auditing Challenge:</span>
+            </span>
+            <select
+              value={selectedChallengeId || ''}
+              onChange={(e) => handleChallengeSelect(e.target.value)}
+              className="px-3 py-1.5 text-xs font-semibold bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition shadow-2xs cursor-pointer"
+            >
+              {challenges.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.status.toUpperCase()} — {c.duration_days} Days)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Metrics &amp; CSV exports scoped to disciplines registered for &ldquo;{challengeName}&rdquo;.
+          </p>
+        </div>
+      )}
 
       {/* ── 4 Summary Stat Cards ──────────────────────────────── */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">

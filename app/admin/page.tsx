@@ -14,11 +14,13 @@ import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
+import ChallengesManager from '@/components/admin/ChallengesManager'
 import ScheduleSettingsCard from '@/components/admin/ScheduleSettingsCard'
 import CurriculumArchitect from '@/components/admin/CurriculumArchitect'
 import MemberRosterTable, { type MemberRosterItem } from '@/components/admin/MemberRosterTable'
 import AnnouncementManager from '@/components/admin/AnnouncementManager'
 import PendingApprovalsSection from '@/components/admin/PendingApprovalsSection'
+import { getAdminChallenges } from '@/lib/actions/admin'
 import type {
   Profile,
   ChallengeSettings,
@@ -27,7 +29,14 @@ import type {
   AnnouncementWithAuthor,
 } from '@/lib/types'
 
-export default async function AdminPage() {
+interface AdminPageProps {
+  searchParams?: Promise<{
+    challenge?: string
+  }>
+}
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const resolvedParams = searchParams ? await searchParams : {}
   const supabase = await createClient()
 
   const {
@@ -46,7 +55,25 @@ export default async function AdminPage() {
     redirect('/dashboard')
   }
 
+  // Fetch all challenges first to determine target challenge scope
+  const adminChallenges = await getAdminChallenges()
+
+  let selectedChallenge = adminChallenges.find((c) => c.id === resolvedParams.challenge)
+  if (!selectedChallenge) {
+    selectedChallenge = adminChallenges.find((c) => c.status === 'active') || adminChallenges[0] || null
+  }
+  const targetChallengeId = selectedChallenge?.id
+
   // Fetch all admin data in parallel
+  let daysQuery = supabase
+    .from('challenge_days')
+    .select('*, activities(id, challenge_day_id, description, sort_order, video_url)')
+    .order('day_number', { ascending: true })
+
+  if (targetChallengeId) {
+    daysQuery = daysQuery.eq('challenge_id', targetChallengeId)
+  }
+
   const [
     settingsRes,
     daysRes,
@@ -57,12 +84,13 @@ export default async function AdminPage() {
     announcementsRes,
   ] = await Promise.all([
     supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-    supabase
-      .from('challenge_days')
-      .select('*, activities(id, challenge_day_id, description, sort_order, video_url)')
-      .order('day_number', { ascending: true }),
-    supabase.rpc('get_day_completion_counts'),
-    supabase.rpc('get_current_challenge_day'),
+    daysQuery,
+    targetChallengeId
+      ? supabase.rpc('get_day_completion_counts', { target_challenge_id: targetChallengeId })
+      : supabase.rpc('get_day_completion_counts'),
+    targetChallengeId
+      ? supabase.rpc('get_current_challenge_day', { target_challenge_id: targetChallengeId })
+      : supabase.rpc('get_current_challenge_day'),
     supabase
       .from('profiles')
       .select('*')
@@ -122,8 +150,9 @@ export default async function AdminPage() {
     })
   )
 
-  const durationDays = settings?.duration_days ?? 40
-  const challengeName = settings?.challenge_name ?? 'Overcomer'
+  const durationDays = selectedChallenge?.duration_days ?? settings?.duration_days ?? 40
+  const challengeName = selectedChallenge?.name ?? settings?.challenge_name ?? 'Overcomer'
+  const startDateStr = selectedChallenge?.start_date ?? settings?.start_date ?? null
 
   // ── Stat calculations ──────────────────────────────────────
   const readyDaysCount = days.filter((d) => (d.activities?.length ?? 0) > 0).length
@@ -139,8 +168,8 @@ export default async function AdminPage() {
       : 0
 
   const endDateStr = (() => {
-    if (!settings?.start_date) return 'Not set'
-    const d = new Date(settings.start_date)
+    if (!startDateStr) return 'Not set'
+    const d = new Date(startDateStr)
     d.setDate(d.getDate() + (durationDays - 1))
     return d.toLocaleDateString('en-US', {
       month: 'short',
@@ -342,6 +371,14 @@ export default async function AdminPage() {
           </div>
         </section>
 
+        {/* ── Section 0: Challenges Manager ─────────────────────── */}
+        <div className="mt-6">
+          <ChallengesManager
+            challenges={adminChallenges}
+            selectedChallengeId={targetChallengeId ?? ''}
+          />
+        </div>
+
         {/* ── Section 1: Schedule Settings ────────────────────── */}
         <div className="mt-6">
           <ScheduleSettingsCard
@@ -369,9 +406,12 @@ export default async function AdminPage() {
           <CurriculumArchitect
             days={days}
             completionCounts={completionCounts}
-            startDate={settings?.start_date ?? null}
+            startDate={startDateStr}
             durationDays={durationDays}
             challengeName={challengeName}
+            challengeId={targetChallengeId}
+            challenges={adminChallenges}
+            challengeStatus={selectedChallenge?.status}
           />
         </div>
 

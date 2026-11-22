@@ -19,6 +19,28 @@ export type Profile = {
   created_at: string
 }
 
+export type ChallengeStatus = 'upcoming' | 'active' | 'completed'
+
+export type Challenge = {
+  id: string
+  name: string
+  duration_days: number
+  start_date: string
+  timezone: string
+  last_notified_challenge_day?: number
+  created_at: string
+}
+
+export type ChallengeWithStatus = Challenge & {
+  status: ChallengeStatus
+  current_day: number
+  end_date: string
+}
+
+export type ChallengeWithStats = ChallengeWithStatus & {
+  participant_count: number
+}
+
 export type ChallengeSettings = {
   id: 1
   start_date: string | null
@@ -60,6 +82,7 @@ export type PushDispatchResult = {
 
 export type ChallengeDay = {
   id: string
+  challenge_id: string
   day_number: number
   title: string
   description: string | null
@@ -239,6 +262,28 @@ export type Database = {
         }
         Relationships: []
       }
+      challenges: {
+        Row: Challenge
+        Insert: {
+          id?: string
+          name: string
+          duration_days: number
+          start_date: string
+          timezone?: string
+          last_notified_challenge_day?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          duration_days?: number
+          start_date?: string
+          timezone?: string
+          last_notified_challenge_day?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       challenge_settings: {
         Row: ChallengeSettings
         Insert: {
@@ -265,6 +310,7 @@ export type Database = {
         Row: ChallengeDay
         Insert: {
           id?: string
+          challenge_id?: string
           day_number: number
           title?: string
           description?: string | null
@@ -274,6 +320,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          challenge_id?: string
           day_number?: number
           title?: string
           description?: string | null
@@ -281,7 +328,15 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'challenge_days_challenge_id_fkey'
+            columns: ['challenge_id']
+            isOneToOne: false
+            referencedRelation: 'challenges'
+            referencedColumns: ['id']
+          }
+        ]
       }
       activities: {
         Row: Activity
@@ -462,19 +517,31 @@ export type Database = {
     Views: Record<string, never>
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean }
-      get_current_challenge_day: { Args: Record<string, never>; Returns: number }
-      get_member_streak: { Args: { member_id: string }; Returns: number }
+      get_current_challenge_day: { Args: { target_challenge_id?: string }; Returns: number }
+      get_member_streak: { Args: { member_id: string; target_challenge_id?: string }; Returns: number }
       get_member_stats: {
-        Args: { member_id: string }
+        Args: { member_id: string; target_challenge_id?: string }
         Returns: MemberStats[]
       }
       get_leaderboard: {
-        Args: { limit_count?: number }
+        Args: { target_challenge_id?: string }
         Returns: LeaderboardPayload | LeaderboardEntry[]
       }
       get_day_completion_counts: {
-        Args: Record<string, never>
+        Args: { target_challenge_id?: string }
         Returns: DayCompletionCount[]
+      }
+      get_challenge_status: {
+        Args: { c_id: string }
+        Returns: string
+      }
+      get_default_challenge_id: {
+        Args: Record<string, never>
+        Returns: string
+      }
+      get_table_counts: {
+        Args: Record<string, never>
+        Returns: Record<string, number>
       }
       seed_default_40_days: {
         Args: Record<string, never>
