@@ -75,7 +75,9 @@ BEGIN
 END $$;
 
 -- 4. UPDATE CHALLENGES_WITH_STATUS VIEW TO INCLUDE ENROLLMENT_MODE
-CREATE OR REPLACE VIEW public.challenges_with_status AS
+DROP VIEW IF EXISTS public.challenges_with_status CASCADE;
+
+CREATE VIEW public.challenges_with_status AS
 SELECT
   c.id,
   c.name,

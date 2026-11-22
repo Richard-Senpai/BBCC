@@ -4,6 +4,15 @@
 -- Run this in the Supabase SQL Editor
 -- ============================================================
 
+-- 0. PREREQUISITE: ENSURE ENROLLMENT MODE EXISTS ON CHALLENGES
+ALTER TABLE public.challenges
+ADD COLUMN IF NOT EXISTS enrollment_mode text NOT NULL DEFAULT 'open'
+CHECK (enrollment_mode IN ('open', 'approval'));
+
+UPDATE public.challenges
+SET enrollment_mode = 'open'
+WHERE enrollment_mode IS NULL OR enrollment_mode = '';
+
 -- 1. ADD TYPE AND COURSE CONFIGURATION COLUMNS TO CHALLENGES
 ALTER TABLE public.challenges
 ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'daily'
@@ -45,7 +54,9 @@ CHECK (
 
 -- 2. UPDATE CHALLENGES_WITH_STATUS VIEW
 -- Restrict to daily challenges so date math is never run on courses
-CREATE OR REPLACE VIEW public.challenges_with_status AS
+DROP VIEW IF EXISTS public.challenges_with_status CASCADE;
+
+CREATE VIEW public.challenges_with_status AS
 SELECT
   c.id,
   c.name,
