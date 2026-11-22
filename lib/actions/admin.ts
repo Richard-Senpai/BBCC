@@ -14,6 +14,9 @@ import type {
   EnrollmentStatus,
   ChallengeEnrollmentWithUser,
   ChallengeDeleteSummary,
+  ChallengeType,
+  CourseAccessMode,
+  CourseLesson,
 } from '@/lib/types'
 
 function checkDateOverlap(
@@ -63,7 +66,7 @@ export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
     const { data: challenges, error } = await supabase
       .from('challenges')
       .select('*')
-      .order('start_date', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (error || !challenges) {
       console.error('[getAdminChallenges] Error:', error)
@@ -72,8 +75,62 @@ export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
 
     const results: ChallengeWithStats[] = await Promise.all(
       challenges.map(async (c) => {
-        const startDate = c.start_date
-        const duration = c.duration_days
+        const type: ChallengeType = (c.type as ChallengeType) || 'daily'
+        const enrollmentMode: EnrollmentMode = (c.enrollment_mode as EnrollmentMode) || 'open'
+
+        let pendingRequestsCount = 0
+        if (enrollmentMode === 'approval') {
+          try {
+            const { count: pendingCount } = await supabase
+              .from('challenge_enrollments')
+              .select('*', { count: 'exact', head: true })
+              .eq('challenge_id', c.id)
+              .eq('status', 'pending')
+            pendingRequestsCount = pendingCount ?? 0
+          } catch {
+            pendingRequestsCount = 0
+          }
+        }
+
+        // Course handling
+        if (type === 'course') {
+          // Lessons count
+          const { count: lessonCount } = await supabase
+            .from('course_lessons')
+            .select('*', { count: 'exact', head: true })
+            .eq('challenge_id', c.id)
+
+          // Members started
+          const { count: startedCount } = await supabase
+            .from('course_member_state')
+            .select('*', { count: 'exact', head: true })
+            .eq('challenge_id', c.id)
+
+          // Members completed
+          const { count: completedCount } = await supabase
+            .from('course_member_state')
+            .select('*', { count: 'exact', head: true })
+            .eq('challenge_id', c.id)
+            .not('completed_at', 'is', null)
+
+          return {
+            ...c,
+            type: 'course',
+            status: 'course' as any,
+            current_day: 0,
+            end_date: '',
+            participant_count: startedCount ?? 0,
+            lesson_count: lessonCount ?? 0,
+            members_started: startedCount ?? 0,
+            members_completed: completedCount ?? 0,
+            pending_requests_count: pendingRequestsCount,
+            is_published: c.is_published ?? false,
+          }
+        }
+
+        // Daily Challenge handling
+        const startDate = c.start_date || ''
+        const duration = c.duration_days || 40
         const tz = c.timezone || 'Africa/Lagos'
 
         const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
@@ -126,23 +183,10 @@ export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
           }
         }
 
-        let pendingRequestsCount = 0
-        if (c.enrollment_mode === 'approval') {
-          try {
-            const { count: pendingCount } = await supabase
-              .from('challenge_enrollments')
-              .select('*', { count: 'exact', head: true })
-              .eq('challenge_id', c.id)
-              .eq('status', 'pending')
-            pendingRequestsCount = pendingCount ?? 0
-          } catch {
-            pendingRequestsCount = 0
-          }
-        }
-
         return {
           ...c,
-          enrollment_mode: (c.enrollment_mode as EnrollmentMode) || 'open',
+          type: 'daily',
+          enrollment_mode: enrollmentMode,
           status,
           current_day: currentDay,
           end_date: endStr,
@@ -160,16 +204,19 @@ export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
 }
 
 /**
- * Create a new challenge.
- * Validates that date ranges do not overlap an existing challenge.
- * Automatically generates day slots 1 to N with default templates and activities.
+ * Create a new challenge (Daily Consecration Cycle or Self-Paced Course).
  */
 export async function createChallenge(params: {
   name: string
-  durationDays: number
-  startDate: string
+  type?: ChallengeType
+  durationDays?: number
+  startDate?: string
   timezone?: string
   enrollmentMode?: EnrollmentMode
+  description?: string
+  accessMode?: CourseAccessMode
+  accessEndDate?: string
+  accessDays?: number
 }): Promise<{
   success: boolean
   error?: string
@@ -178,12 +225,60 @@ export async function createChallenge(params: {
   try {
     const { supabase } = await assertAdmin()
     const name = params.name.trim()
-    const durationDays = Number(params.durationDays)
-    const startDate = params.startDate.trim()
+    const type: ChallengeType = params.type === 'course' ? 'course' : 'daily'
     const timezone = params.timezone?.trim() || 'Africa/Lagos'
     const enrollmentMode: EnrollmentMode = params.enrollmentMode === 'approval' ? 'approval' : 'open'
 
     if (!name) return { success: false, error: 'Challenge name cannot be empty.' }
+
+    // ── COURSE CREATION ─────────────────────────────────────────
+    if (type === 'course') {
+      const accessMode: CourseAccessMode = params.accessMode || 'unlimited'
+      let accessEndDate: string | null = null
+      let accessDays: number | null = null
+
+      if (accessMode === 'fixed_end') {
+        if (!params.accessEndDate || isNaN(new Date(params.accessEndDate).getTime())) {
+          return { success: false, error: 'Please specify a valid fixed end date.' }
+        }
+        accessEndDate = params.accessEndDate.trim()
+      } else if (accessMode === 'per_member_days') {
+        accessDays = Number(params.accessDays)
+        if (isNaN(accessDays) || accessDays < 1) {
+          return { success: false, error: 'Please specify valid access days (at least 1 day).' }
+        }
+      }
+
+      const { data: newCourse, error: insertErr } = await supabase
+        .from('challenges')
+        .insert({
+          name,
+          type: 'course',
+          is_published: false,
+          description: params.description?.trim() || null,
+          access_mode: accessMode,
+          access_end_date: accessEndDate,
+          access_days: accessDays,
+          timezone,
+          enrollment_mode: enrollmentMode,
+          start_date: null,
+          duration_days: null,
+        })
+        .select('id')
+        .single()
+
+      if (insertErr || !newCourse) {
+        return { success: false, error: insertErr?.message || 'Failed to create course.' }
+      }
+
+      revalidatePath('/admin')
+      return { success: true, challengeId: newCourse.id }
+    }
+
+    // ── DAILY CHALLENGE CREATION ────────────────────────────────
+    const durationDays = Number(params.durationDays)
+    const startDate = params.startDate?.trim() || ''
+
     if (isNaN(durationDays) || durationDays < 1 || durationDays > 365) {
       return { success: false, error: 'Duration must be between 1 and 365 days.' }
     }
@@ -191,10 +286,11 @@ export async function createChallenge(params: {
       return { success: false, error: 'Please specify a valid start date.' }
     }
 
-    // 1. Check overlap with all existing challenges
+    // 1. Check overlap only against existing DAILY challenges
     const { data: existingChallenges, error: fetchErr } = await supabase
       .from('challenges')
       .select('id, name, duration_days, start_date')
+      .eq('type', 'daily')
 
     if (fetchErr) {
       console.error('[createChallenge] Error fetching existing challenges:', fetchErr)
@@ -202,7 +298,7 @@ export async function createChallenge(params: {
 
     if (existingChallenges && existingChallenges.length > 0) {
       for (const ec of existingChallenges) {
-        if (checkDateOverlap(startDate, durationDays, ec.start_date, ec.duration_days)) {
+        if (ec.start_date && ec.duration_days && checkDateOverlap(startDate, durationDays, ec.start_date, ec.duration_days)) {
           const ecEndDate = new Date(
             new Date(ec.start_date + 'T00:00:00Z').getTime() + (ec.duration_days - 1) * 86400000
           )
@@ -210,17 +306,18 @@ export async function createChallenge(params: {
             .split('T')[0]
           return {
             success: false,
-            error: `Challenge dates overlap with existing challenge "${ec.name}" (${ec.start_date} to ${ecEndDate}). Challenges cannot overlap in dates.`,
+            error: `Challenge dates overlap with existing challenge "${ec.name}" (${ec.start_date} to ${ecEndDate}). Daily challenges cannot overlap in dates.`,
           }
         }
       }
     }
 
-    // 2. Insert new challenge
+    // 2. Insert new daily challenge
     const { data: newChallenge, error: insertErr } = await supabase
       .from('challenges')
       .insert({
         name,
+        type: 'daily',
         duration_days: durationDays,
         start_date: startDate,
         timezone,
@@ -237,7 +334,7 @@ export async function createChallenge(params: {
 
     // 3. Generate day slots 1 to N with default templates and 3 default activities
     for (let i = 1; i <= durationDays; i++) {
-      const { data: dayRow, error: dayError } = await supabase
+      const { data: dayRow } = await supabase
         .from('challenge_days')
         .insert({
           challenge_id: challengeId,
@@ -249,9 +346,7 @@ export async function createChallenge(params: {
         .select('id')
         .single()
 
-      if (dayError) {
-        console.error(`[createChallenge] Error generating day ${i}:`, dayError)
-      } else if (dayRow) {
+      if (dayRow) {
         await supabase.from('activities').insert([
           {
             challenge_day_id: dayRow.id,
@@ -325,7 +420,7 @@ export async function copyChallengeDays(
 
     // 3. For each day up to target duration, copy content
     for (const sDay of sourceDays) {
-      if (sDay.day_number > targetChallenge.duration_days) continue
+      if (targetChallenge.duration_days && sDay.day_number > targetChallenge.duration_days) continue
 
       const { data: targetDay, error: dayErr } = await supabase
         .from('challenge_days')
@@ -389,20 +484,94 @@ export async function updateChallenge(
   challengeId: string,
   params: {
     name: string
-    durationDays: number
-    startDate: string
+    durationDays?: number
+    startDate?: string
     timezone?: string
     enrollmentMode?: EnrollmentMode
+    description?: string
+    accessMode?: CourseAccessMode
+    accessEndDate?: string
+    accessDays?: number
+    isPublished?: boolean
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { supabase, user } = await assertAdmin()
     const name = params.name.trim()
-    const durationDays = Number(params.durationDays)
-    const startDate = params.startDate.trim()
     const timezone = params.timezone?.trim() || 'Africa/Lagos'
 
     if (!name) return { success: false, error: 'Challenge name cannot be empty.' }
+
+    // Fetch existing challenge
+    const { data: existingChallenge } = await supabase
+      .from('challenges')
+      .select('id, name, type, duration_days, start_date, enrollment_mode, access_mode')
+      .eq('id', challengeId)
+      .single()
+
+    if (!existingChallenge) {
+      return { success: false, error: 'Challenge not found.' }
+    }
+
+    const type: ChallengeType = (existingChallenge.type as ChallengeType) || 'daily'
+    const currentMode = existingChallenge.enrollment_mode || 'open'
+    const targetMode = params.enrollmentMode || currentMode
+
+    // ── COURSE UPDATE ───────────────────────────────────────────
+    if (type === 'course') {
+      const accessMode: CourseAccessMode = params.accessMode || existingChallenge.access_mode || 'unlimited'
+      let accessEndDate: string | null = null
+      let accessDays: number | null = null
+
+      if (accessMode === 'fixed_end') {
+        if (params.accessEndDate && isNaN(new Date(params.accessEndDate).getTime())) {
+          return { success: false, error: 'Please specify a valid fixed end date.' }
+        }
+        accessEndDate = params.accessEndDate?.trim() || null
+      } else if (accessMode === 'per_member_days') {
+        accessDays = Number(params.accessDays)
+        if (isNaN(accessDays) || accessDays < 1) {
+          return { success: false, error: 'Please specify valid access days (at least 1 day).' }
+        }
+      }
+
+      const updatePayload: {
+        name: string
+        timezone: string
+        enrollment_mode: EnrollmentMode
+        description?: string | null
+        access_mode?: CourseAccessMode | null
+        access_end_date?: string | null
+        access_days?: number | null
+        is_published?: boolean
+      } = {
+        name,
+        timezone,
+        enrollment_mode: targetMode,
+        access_mode: accessMode,
+        access_end_date: accessEndDate,
+        access_days: accessDays,
+        ...(params.description !== undefined ? { description: params.description?.trim() || null } : {}),
+        ...(params.isPublished !== undefined ? { is_published: params.isPublished } : {}),
+      }
+
+      const { error: updErr } = await supabase
+        .from('challenges')
+        .update(updatePayload)
+        .eq('id', challengeId)
+
+      if (updErr) {
+        return { success: false, error: updErr.message }
+      }
+
+      revalidatePath('/admin')
+      return { success: true }
+    }
+
+    // ── DAILY CHALLENGE UPDATE ──────────────────────────────────
+    const durationDays = Number(params.durationDays)
+    const startDate = params.startDate?.trim() || ''
+
     if (isNaN(durationDays) || durationDays < 1 || durationDays > 365) {
       return { success: false, error: 'Duration must be between 1 and 365 days.' }
     }
@@ -410,22 +579,16 @@ export async function updateChallenge(
       return { success: false, error: 'Please specify a valid start date.' }
     }
 
-    // Fetch existing challenge
-    const { data: existingChallenge } = await supabase
-      .from('challenges')
-      .select('id, name, duration_days, start_date, enrollment_mode')
-      .eq('id', challengeId)
-      .single()
-
-    // Check overlap with other challenges
+    // Check overlap with other DAILY challenges
     const { data: otherChallenges } = await supabase
       .from('challenges')
       .select('id, name, duration_days, start_date')
+      .eq('type', 'daily')
       .neq('id', challengeId)
 
     if (otherChallenges && otherChallenges.length > 0) {
       for (const oc of otherChallenges) {
-        if (checkDateOverlap(startDate, durationDays, oc.start_date, oc.duration_days)) {
+        if (oc.start_date && oc.duration_days && checkDateOverlap(startDate, durationDays, oc.start_date, oc.duration_days)) {
           const ocEndDate = new Date(
             new Date(oc.start_date + 'T00:00:00Z').getTime() + (oc.duration_days - 1) * 86400000
           )
@@ -433,14 +596,11 @@ export async function updateChallenge(
             .split('T')[0]
           return {
             success: false,
-            error: `Challenge dates overlap with existing challenge "${oc.name}" (${oc.start_date} to ${ocEndDate}). Challenges cannot overlap in dates.`,
+            error: `Challenge dates overlap with existing challenge "${oc.name}" (${oc.start_date} to ${ecEndDate(oc.start_date, oc.duration_days)}). Daily challenges cannot overlap in dates.`,
           }
         }
       }
     }
-
-    const currentMode = existingChallenge?.enrollment_mode || 'open'
-    const targetMode = params.enrollmentMode || currentMode
 
     // If switching Open -> Approval: grandfather existing participants
     if (targetMode === 'approval' && currentMode !== 'approval') {
@@ -544,6 +704,385 @@ export async function updateChallenge(
   }
 }
 
+function ecEndDate(start: string, duration: number): string {
+  return new Date(new Date(start + 'T00:00:00Z').getTime() + (duration - 1) * 86400000)
+    .toISOString()
+    .split('T')[0]
+}
+
+// ─────────────────────────────────────────────────────────────
+// COURSE MANAGEMENT ACTIONS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Toggle published status of a course.
+ * Publishing requires at least one lesson with at least one content block.
+ */
+export async function toggleCoursePublished(
+  courseId: string
+): Promise<{ success: boolean; isPublished?: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // 1. Fetch current status
+    const { data: course, error: fetchErr } = await supabase
+      .from('challenges')
+      .select('id, name, type, is_published')
+      .eq('id', courseId)
+      .single()
+
+    if (fetchErr || !course) {
+      return { success: false, error: 'Course not found.' }
+    }
+
+    const willPublish = !course.is_published
+
+    // 2. If publishing, validate lesson and block requirements
+    if (willPublish) {
+      const { data: lessons, error: lessErr } = await supabase
+        .from('course_lessons')
+        .select('id')
+        .eq('challenge_id', courseId)
+
+      if (lessErr || !lessons || lessons.length === 0) {
+        return {
+          success: false,
+          error: 'Cannot publish course: Course must have at least one lesson before publishing.',
+        }
+      }
+
+      const lessonIds = lessons.map((l) => l.id)
+      const { count: blocksCount } = await supabase
+        .from('course_blocks')
+        .select('*', { count: 'exact', head: true })
+        .in('lesson_id', lessonIds)
+
+      if (!blocksCount || blocksCount === 0) {
+        return {
+          success: false,
+          error: 'Cannot publish course: Course lessons must contain at least one content block before publishing.',
+        }
+      }
+    }
+
+    // 3. Update status
+    const { error: updErr } = await supabase
+      .from('challenges')
+      .update({ is_published: willPublish })
+      .eq('id', courseId)
+
+    if (updErr) {
+      return { success: false, error: updErr.message }
+    }
+
+    revalidatePath('/admin')
+    revalidatePath('/hub')
+    revalidatePath('/challenges')
+    return { success: true, isPublished: willPublish }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to toggle course published status',
+    }
+  }
+}
+
+/**
+ * Fetch all lessons for a course ordered by position ASC.
+ */
+export async function getCourseLessons(
+  courseId: string
+): Promise<{ success: boolean; lessons: CourseLesson[]; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    const { data: lessons, error } = await supabase
+      .from('course_lessons')
+      .select('*')
+      .eq('challenge_id', courseId)
+      .order('position', { ascending: true })
+
+    if (error) {
+      return { success: false, lessons: [], error: error.message }
+    }
+
+    const lessonsWithCounts = await Promise.all(
+      (lessons ?? []).map(async (l) => {
+        const [blockRes, compRes] = await Promise.all([
+          supabase
+            .from('course_blocks')
+            .select('*', { count: 'exact', head: true })
+            .eq('lesson_id', l.id),
+          supabase
+            .from('course_lesson_completions')
+            .select('*', { count: 'exact', head: true })
+            .eq('lesson_id', l.id),
+        ])
+
+        return {
+          ...l,
+          block_count: blockRes.count ?? 0,
+          completed_count: compRes.count ?? 0,
+        }
+      })
+    )
+
+    return { success: true, lessons: lessonsWithCounts }
+  } catch (err) {
+    return {
+      success: false,
+      lessons: [],
+      error: err instanceof Error ? err.message : 'Failed to fetch course lessons',
+    }
+  }
+}
+
+/**
+ * Create a new lesson at the end of a course.
+ */
+export async function createCourseLesson(
+  courseId: string,
+  params: { title: string; summary?: string }
+): Promise<{ success: boolean; lesson?: CourseLesson; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+    const title = params.title.trim()
+    if (!title) return { success: false, error: 'Lesson title cannot be empty.' }
+
+    // 1. Get current maximum position
+    const { data: maxLesson } = await supabase
+      .from('course_lessons')
+      .select('position')
+      .eq('challenge_id', courseId)
+      .order('position', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const nextPos = (maxLesson?.position ?? 0) + 1
+
+    // 2. Insert new lesson
+    const { data: newLesson, error: insErr } = await supabase
+      .from('course_lessons')
+      .insert({
+        challenge_id: courseId,
+        position: nextPos,
+        title,
+        summary: params.summary?.trim() || null,
+      })
+      .select('*')
+      .single()
+
+    if (insErr || !newLesson) {
+      return { success: false, error: insErr?.message || 'Failed to create lesson.' }
+    }
+
+    revalidatePath('/admin')
+    return {
+      success: true,
+      lesson: { ...newLesson, block_count: 0, completed_count: 0 },
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to create course lesson',
+    }
+  }
+}
+
+/**
+ * Update an existing lesson's title and summary.
+ */
+export async function updateCourseLesson(
+  lessonId: string,
+  params: { title: string; summary?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+    const title = params.title.trim()
+    if (!title) return { success: false, error: 'Lesson title cannot be empty.' }
+
+    const { error: updErr } = await supabase
+      .from('course_lessons')
+      .update({
+        title,
+        summary: params.summary?.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId)
+
+    if (updErr) {
+      return { success: false, error: updErr.message }
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to update course lesson',
+    }
+  }
+}
+
+/**
+ * Delete a lesson from a course and re-sequence remaining positions.
+ */
+export async function deleteCourseLesson(
+  lessonId: string
+): Promise<{ success: boolean; affectedMembersCount?: number; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // 1. Fetch lesson to know challenge_id and position
+    const { data: lesson, error: fetchErr } = await supabase
+      .from('course_lessons')
+      .select('id, challenge_id, position')
+      .eq('id', lessonId)
+      .single()
+
+    if (fetchErr || !lesson) {
+      return { success: false, error: 'Lesson not found.' }
+    }
+
+    // 2. Count affected members who completed this lesson
+    const { count: completedCount } = await supabase
+      .from('course_lesson_completions')
+      .select('*', { count: 'exact', head: true })
+      .eq('lesson_id', lessonId)
+
+    // 3. Delete lesson (cascades to blocks and completions)
+    const { error: delErr } = await supabase
+      .from('course_lessons')
+      .delete()
+      .eq('id', lessonId)
+
+    if (delErr) {
+      return { success: false, error: delErr.message }
+    }
+
+    // 4. Re-sequence remaining lessons
+    const { data: remainingLessons } = await supabase
+      .from('course_lessons')
+      .select('id, position')
+      .eq('challenge_id', lesson.challenge_id)
+      .order('position', { ascending: true })
+
+    if (remainingLessons) {
+      for (let i = 0; i < remainingLessons.length; i++) {
+        if (remainingLessons[i].position !== i + 1) {
+          await supabase
+            .from('course_lessons')
+            .update({ position: i + 1 })
+            .eq('id', remainingLessons[i].id)
+        }
+      }
+    }
+
+    revalidatePath('/admin')
+    return { success: true, affectedMembersCount: completedCount ?? 0 }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to delete course lesson',
+    }
+  }
+}
+
+/**
+ * Reorder lessons in a course.
+ */
+export async function reorderCourseLessons(
+  courseId: string,
+  orderedLessonIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    // Shift to negative temporary positions first to prevent unique constraint collisions
+    for (let i = 0; i < orderedLessonIds.length; i++) {
+      await supabase
+        .from('course_lessons')
+        .update({ position: -(i + 1) })
+        .eq('id', orderedLessonIds[i])
+    }
+
+    // Assign final 1-indexed positive positions
+    for (let i = 0; i < orderedLessonIds.length; i++) {
+      await supabase
+        .from('course_lessons')
+        .update({ position: i + 1 })
+        .eq('id', orderedLessonIds[i])
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to reorder lessons',
+    }
+  }
+}
+
+/**
+ * Get member completion count for a lesson before deletion or reordering.
+ */
+export async function getCourseLessonProgressStats(
+  lessonId: string
+): Promise<{ count: number; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+    const { count } = await supabase
+      .from('course_lesson_completions')
+      .select('*', { count: 'exact', head: true })
+      .eq('lesson_id', lessonId)
+
+    return { count: count ?? 0 }
+  } catch (err) {
+    return { count: 0, error: err instanceof Error ? err.message : 'Failed to get stats' }
+  }
+}
+
+/**
+ * Extend a member's access to a course (sets access_override_until).
+ */
+export async function extendMemberCourseAccess(params: {
+  courseId: string
+  userId: string
+  overrideUntil: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdmin()
+
+    if (!params.overrideUntil || isNaN(new Date(params.overrideUntil).getTime())) {
+      return { success: false, error: 'Please provide a valid extension date.' }
+    }
+
+    const { error } = await supabase
+      .from('course_member_state')
+      .upsert(
+        {
+          challenge_id: params.courseId,
+          user_id: params.userId,
+          access_override_until: new Date(params.overrideUntil).toISOString(),
+        },
+        { onConflict: 'challenge_id, user_id' }
+      )
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to extend member course access',
+    }
+  }
+}
+
 /**
  * Get count of members who would be grandfathered in if an open challenge is switched to approval.
  */
@@ -606,6 +1145,51 @@ export async function getChallengeEnrollments(challengeId: string): Promise<{
     const typedRows = (rows ?? []) as unknown as ChallengeEnrollmentWithUser[]
     const pending = typedRows.filter((r) => r.status === 'pending')
     const enrolled = typedRows.filter((r) => r.status === 'approved')
+
+    // If challenge is a course, enrich enrolled members with course progress & access override
+    const { data: chal } = await supabase
+      .from('challenges')
+      .select('type')
+      .eq('id', challengeId)
+      .maybeSingle()
+
+    if (chal?.type === 'course' && enrolled.length > 0) {
+      const userIds = enrolled.map((e) => e.user_id)
+      const [{ data: memberStates }, { count: totalLessons }, { data: completions }] =
+        await Promise.all([
+          supabase
+            .from('course_member_state')
+            .select('user_id, started_at, access_override_until, completed_at')
+            .eq('challenge_id', challengeId)
+            .in('user_id', userIds),
+          supabase
+            .from('course_lessons')
+            .select('*', { count: 'exact', head: true })
+            .eq('challenge_id', challengeId),
+          supabase
+            .from('course_lesson_completions')
+            .select('user_id, course_lessons!inner(challenge_id)')
+            .eq('course_lessons.challenge_id', challengeId)
+            .in('user_id', userIds),
+        ])
+
+      const stateMap = new Map((memberStates ?? []).map((s) => [s.user_id, s]))
+      const compMap = new Map<string, number>()
+      for (const c of (completions ?? []) as { user_id: string }[]) {
+        compMap.set(c.user_id, (compMap.get(c.user_id) ?? 0) + 1)
+      }
+
+      for (const e of enrolled) {
+        const s = stateMap.get(e.user_id)
+        e.course_member_state = {
+          started_at: s?.started_at ?? null,
+          access_override_until: s?.access_override_until ?? null,
+          completed_at: s?.completed_at ?? null,
+          completed_lessons_count: compMap.get(e.user_id) ?? 0,
+          total_lessons_count: totalLessons ?? 0,
+        }
+      }
+    }
 
     return { success: true, pending, enrolled }
   } catch (err) {
@@ -752,6 +1336,67 @@ export async function getChallengeDeleteSummary(challengeId: string): Promise<{
       return { success: false, error: 'Challenge not found' }
     }
 
+    const { count: enrollCount } = await supabase
+      .from('challenge_enrollments')
+      .select('*', { count: 'exact', head: true })
+      .eq('challenge_id', challengeId)
+
+    if (challenge.type === 'course') {
+      const { count: lessonsCount } = await supabase
+        .from('course_lessons')
+        .select('*', { count: 'exact', head: true })
+        .eq('challenge_id', challengeId)
+
+      const { data: cLessons } = await supabase
+        .from('course_lessons')
+        .select('id')
+        .eq('challenge_id', challengeId)
+
+      const lessonIds = (cLessons ?? []).map((l) => l.id)
+      let blocksCount = 0
+      let lessonCompsCount = 0
+
+      if (lessonIds.length > 0) {
+        const [bRes, compRes] = await Promise.all([
+          supabase
+            .from('course_blocks')
+            .select('*', { count: 'exact', head: true })
+            .in('lesson_id', lessonIds),
+          supabase
+            .from('course_lesson_completions')
+            .select('*', { count: 'exact', head: true })
+            .in('lesson_id', lessonIds),
+        ])
+        blocksCount = bRes.count ?? 0
+        lessonCompsCount = compRes.count ?? 0
+      }
+
+      const { count: startedCount } = await supabase
+        .from('course_member_state')
+        .select('*', { count: 'exact', head: true })
+        .eq('challenge_id', challengeId)
+
+      const summary: ChallengeDeleteSummary = {
+        id: challenge.id,
+        name: challenge.name,
+        type: 'course',
+        status: 'course',
+        days_count: 0,
+        activities_count: 0,
+        participants_count: startedCount ?? 0,
+        completions_count: lessonCompsCount,
+        activity_completions_count: 0,
+        journal_entries_count: 0,
+        enrollments_count: enrollCount ?? 0,
+        lessons_count: lessonsCount ?? 0,
+        blocks_count: blocksCount,
+        members_started: startedCount ?? 0,
+      }
+
+      return { success: true, summary }
+    }
+
+    // Daily Challenge fallback
     const { data: cDays } = await supabase
       .from('challenge_days')
       .select('id, activities(id)')
@@ -803,25 +1448,23 @@ export async function getChallengeDeleteSummary(challengeId: string): Promise<{
       journalCount = jCount ?? 0
     }
 
-    const { count: enrollCount } = await supabase
-      .from('challenge_enrollments')
-      .select('*', { count: 'exact', head: true })
-      .eq('challenge_id', challengeId)
-
     const tz = challenge.timezone || 'Africa/Lagos'
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
+    const cStartDate = challenge.start_date || '2026-01-01'
+    const cDuration = challenge.duration_days ?? 40
     const endStr = new Date(
-      new Date(challenge.start_date + 'T00:00:00Z').getTime() + (challenge.duration_days - 1) * 86400000
+      new Date(cStartDate + 'T00:00:00Z').getTime() + (cDuration - 1) * 86400000
     )
       .toISOString()
       .split('T')[0]
 
     const status: ChallengeStatus =
-      todayStr < challenge.start_date ? 'upcoming' : todayStr > endStr ? 'completed' : 'active'
+      todayStr < cStartDate ? 'upcoming' : todayStr > endStr ? 'completed' : 'active'
 
     const summary: ChallengeDeleteSummary = {
       id: challenge.id,
       name: challenge.name,
+      type: 'daily',
       status,
       days_count: dayIds.length,
       activities_count: actIds.length,

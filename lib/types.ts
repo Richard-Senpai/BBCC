@@ -42,12 +42,24 @@ export type ChallengeEnrollmentWithUser = ChallengeEnrollment & {
     display_tag?: string | null
     fellowship_unit?: string | null
   } | null
+  course_member_state?: {
+    started_at: string | null
+    access_override_until: string | null
+    completed_at: string | null
+    completed_lessons_count?: number
+    total_lessons_count?: number
+  } | null
 }
+
+
+export type ChallengeType = 'daily' | 'course'
+export type CourseAccessMode = 'unlimited' | 'fixed_end' | 'per_member_days'
 
 export type ChallengeDeleteSummary = {
   id: string
   name: string
-  status: ChallengeStatus
+  type?: ChallengeType
+  status: ChallengeStatus | 'course'
   days_count: number
   activities_count: number
   participants_count: number
@@ -55,21 +67,31 @@ export type ChallengeDeleteSummary = {
   activity_completions_count: number
   journal_entries_count: number
   enrollments_count: number
+  // Course-specific counts
+  lessons_count?: number
+  blocks_count?: number
+  members_started?: number
 }
 
 export type Challenge = {
   id: string
   name: string
-  duration_days: number
-  start_date: string
+  type: ChallengeType
+  duration_days: number | null
+  start_date: string | null
   timezone: string
   enrollment_mode: EnrollmentMode
+  is_published?: boolean
+  description?: string | null
+  access_mode?: CourseAccessMode | null
+  access_end_date?: string | null
+  access_days?: number | null
   last_notified_challenge_day?: number
   created_at: string
 }
 
 export type ChallengeWithStatus = Challenge & {
-  status: ChallengeStatus
+  status: ChallengeStatus | 'course'
   current_day: number
   end_date: string
 }
@@ -77,6 +99,57 @@ export type ChallengeWithStatus = Challenge & {
 export type ChallengeWithStats = ChallengeWithStatus & {
   participant_count: number
   pending_requests_count?: number
+  lesson_count?: number
+  members_started?: number
+  members_completed?: number
+}
+
+export type CourseBlockType = 'rich_text' | 'image_text' | 'image' | 'video' | 'link'
+
+export type CourseLesson = {
+  id: string
+  challenge_id: string
+  position: number
+  title: string
+  summary: string | null
+  created_at: string
+  updated_at: string
+  block_count?: number
+  completed_count?: number
+}
+
+export type CourseBlock = {
+  id: string
+  lesson_id: string
+  position: number
+  type: CourseBlockType
+  content: Record<string, unknown>
+  required: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type CourseMemberState = {
+  id: string
+  challenge_id: string
+  user_id: string
+  started_at: string
+  access_override_until: string | null
+  completed_at: string | null
+}
+
+export type CourseLessonCompletion = {
+  id: string
+  user_id: string
+  lesson_id: string
+  completed_at: string
+}
+
+export type CourseBlockConfirmation = {
+  id: string
+  user_id: string
+  block_id: string
+  confirmed_at: string
 }
 
 export type ChallengeSettings = {
@@ -305,22 +378,132 @@ export type Database = {
         Insert: {
           id?: string
           name: string
-          duration_days: number
-          start_date: string
+          duration_days?: number | null
+          start_date?: string | null
           timezone?: string
           enrollment_mode?: EnrollmentMode
+          type?: ChallengeType
+          is_published?: boolean
+          description?: string | null
+          access_mode?: CourseAccessMode | null
+          access_end_date?: string | null
+          access_days?: number | null
           last_notified_challenge_day?: number
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
-          duration_days?: number
-          start_date?: string
+          duration_days?: number | null
+          start_date?: string | null
           timezone?: string
           enrollment_mode?: EnrollmentMode
+          type?: ChallengeType
+          is_published?: boolean
+          description?: string | null
+          access_mode?: CourseAccessMode | null
+          access_end_date?: string | null
+          access_days?: number | null
           last_notified_challenge_day?: number
           created_at?: string
+        }
+        Relationships: []
+      }
+      course_lessons: {
+        Row: CourseLesson
+        Insert: {
+          id?: string
+          challenge_id: string
+          position: number
+          title: string
+          summary?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          challenge_id?: string
+          position?: number
+          title?: string
+          summary?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      course_blocks: {
+        Row: CourseBlock
+        Insert: {
+          id?: string
+          lesson_id: string
+          position: number
+          type: CourseBlockType
+          content?: Record<string, unknown>
+          required?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          lesson_id?: string
+          position?: number
+          type?: CourseBlockType
+          content?: Record<string, unknown>
+          required?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      course_member_state: {
+        Row: CourseMemberState
+        Insert: {
+          id?: string
+          challenge_id: string
+          user_id: string
+          started_at?: string
+          access_override_until?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          challenge_id?: string
+          user_id?: string
+          started_at?: string
+          access_override_until?: string | null
+          completed_at?: string | null
+        }
+        Relationships: []
+      }
+      course_lesson_completions: {
+        Row: CourseLessonCompletion
+        Insert: {
+          id?: string
+          user_id: string
+          lesson_id: string
+          completed_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          lesson_id?: string
+          completed_at?: string
+        }
+        Relationships: []
+      }
+      course_block_confirmations: {
+        Row: CourseBlockConfirmation
+        Insert: {
+          id?: string
+          user_id: string
+          block_id: string
+          confirmed_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          block_id?: string
+          confirmed_at?: string
         }
         Relationships: []
       }
@@ -643,6 +826,26 @@ export type Database = {
       grandfather_existing_participants: {
         Args: { target_challenge_id: string }
         Returns: number
+      }
+      can_access_course: {
+        Args: { target_challenge_id: string }
+        Returns: boolean
+      }
+      is_lesson_unlocked: {
+        Args: { target_lesson_id: string; target_user_id: string }
+        Returns: boolean
+      }
+      start_course: {
+        Args: { target_challenge_id: string }
+        Returns: { success: boolean }
+      }
+      confirm_block: {
+        Args: { target_block_id: string }
+        Returns: { success: boolean }
+      }
+      complete_lesson: {
+        Args: { target_lesson_id: string }
+        Returns: { success: boolean; lesson_id: string; completed_course: boolean }
       }
     }
   }

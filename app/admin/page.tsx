@@ -411,7 +411,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             challengeName={challengeName}
             challengeId={targetChallengeId}
             challenges={adminChallenges}
-            challengeStatus={selectedChallenge?.status}
+            challengeStatus={selectedChallenge?.status !== 'course' ? selectedChallenge?.status : undefined}
           />
         </div>
 

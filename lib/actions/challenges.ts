@@ -73,10 +73,11 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
   const profile = profileRes.data
   const userEnrollments = enrollmentsRes.data ?? []
 
-  // 2. Fetch all challenges from public.challenges (or challenges_with_status)
+  // 2. Fetch all daily challenges from public.challenges (or challenges_with_status)
   let { data: challenges, error } = await supabase
     .from('challenges')
     .select('*')
+    .eq('type', 'daily')
     .order('start_date', { ascending: false })
 
   if (error || !challenges || challenges.length === 0) {
@@ -158,10 +159,12 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
 
   const items: HubChallengeItem[] = await Promise.all(
     challenges.map(async (c) => {
+      const cDuration = c.duration_days ?? 40
+      const cStart = c.start_date || '2026-01-01'
       const tz = c.timezone || 'Africa/Lagos'
       const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now)
-      const startStr = c.start_date
-      const endDateTime = new Date(new Date(c.start_date + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000)
+      const startStr = cStart
+      const endDateTime = new Date(new Date(cStart + 'T00:00:00Z').getTime() + (cDuration - 1) * 86400000)
       const endStr = endDateTime.toISOString().split('T')[0]
 
       let status: ChallengeStatus = 'upcoming'
@@ -172,7 +175,7 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         currentDay = 0
       } else if (todayStr > endStr) {
         status = 'completed'
-        currentDay = c.duration_days + 1
+        currentDay = cDuration + 1
       } else {
         status = 'active'
         const diffDays = Math.floor(
@@ -200,8 +203,8 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         return {
           id: c.id,
           name: c.name,
-          duration_days: c.duration_days,
-          start_date: c.start_date,
+          duration_days: cDuration,
+          start_date: cStart,
           end_date: endStr,
           timezone: tz,
           status,
@@ -225,8 +228,8 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
         return {
           id: c.id,
           name: c.name,
-          duration_days: c.duration_days,
-          start_date: c.start_date,
+          duration_days: cDuration,
+          start_date: cStart,
           end_date: endStr,
           timezone: tz,
           status,
@@ -272,13 +275,13 @@ export async function getMemberHubData(): Promise<HubDataResponse> {
       const userRank = lbData?.my_rank != null ? Number(lbData.my_rank) : null
       const totalRanked = lbData?.total_ranked_members ?? 0
 
-      const pct = Math.min(100, Math.round((stats.total_completed / c.duration_days) * 100))
+      const pct = Math.min(100, Math.round((stats.total_completed / cDuration) * 100))
 
       return {
         id: c.id,
         name: c.name,
-        duration_days: c.duration_days,
-        start_date: c.start_date,
+        duration_days: cDuration,
+        start_date: cStart,
         end_date: endStr,
         timezone: tz,
         status,
@@ -356,7 +359,7 @@ export async function requestChallengeEnrollment(challengeId: string): Promise<{
     // 2. Fetch challenge
     const { data: challenge } = await supabase
       .from('challenges')
-      .select('id, name, start_date, duration_days, timezone, enrollment_mode')
+      .select('id, name, start_date, duration_days, timezone, enrollment_mode, type, access_mode, access_end_date')
       .eq('id', challengeId)
       .single()
 
@@ -370,14 +373,23 @@ export async function requestChallengeEnrollment(challengeId: string): Promise<{
 
     const tz = challenge.timezone || 'Africa/Lagos'
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
-    const endStr = new Date(
-      new Date(challenge.start_date + 'T00:00:00Z').getTime() + (challenge.duration_days - 1) * 86400000
-    )
-      .toISOString()
-      .split('T')[0]
 
-    if (todayStr > endStr) {
-      return { success: false, error: 'This challenge is already completed. Join requests are closed.' }
+    if (challenge.type === 'course') {
+      if (challenge.access_mode === 'fixed_end' && challenge.access_end_date && todayStr > challenge.access_end_date) {
+        return { success: false, error: 'This course is closed for enrollment.' }
+      }
+    } else {
+      const cDuration = challenge.duration_days ?? 40
+      const cStart = challenge.start_date || '2026-01-01'
+      const endStr = new Date(
+        new Date(cStart + 'T00:00:00Z').getTime() + (cDuration - 1) * 86400000
+      )
+        .toISOString()
+        .split('T')[0]
+
+      if (todayStr > endStr) {
+        return { success: false, error: 'This challenge is already completed. Join requests are closed.' }
+      }
     }
 
     // 3. Check existing enrollment row

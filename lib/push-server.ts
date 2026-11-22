@@ -186,10 +186,11 @@ export async function checkAndDispatchNewDayPush(options?: { force?: boolean }):
   try {
     const supabase = await createClient()
 
-    // 1. Fetch challenges to find the currently ACTIVE challenge
+    // 1. Fetch daily challenges to find the currently ACTIVE daily challenge (courses never trigger new-day pushes)
     const { data: challenges, error: chalErr } = await supabase
       .from('challenges')
       .select('*')
+      .eq('type', 'daily')
       .order('start_date', { ascending: false })
 
     if (chalErr || !challenges || challenges.length === 0) {
@@ -205,8 +206,9 @@ export async function checkAndDispatchNewDayPush(options?: { force?: boolean }):
     const activeChallenge = challenges.find((c) => {
       const tz = c.timezone || 'Africa/Lagos'
       const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now)
-      const startStr = c.start_date
-      const endDateTime = new Date(new Date(c.start_date + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000)
+      const startStr = c.start_date || '2026-01-01'
+      const duration = c.duration_days ?? 40
+      const endDateTime = new Date(new Date(startStr + 'T00:00:00Z').getTime() + (duration - 1) * 86400000)
       const endStr = endDateTime.toISOString().split('T')[0]
       return todayStr >= startStr && todayStr <= endStr
     })
@@ -221,17 +223,19 @@ export async function checkAndDispatchNewDayPush(options?: { force?: boolean }):
 
     const tz = activeChallenge.timezone || 'Africa/Lagos'
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now)
+    const activeStart = activeChallenge.start_date || '2026-01-01'
+    const activeDuration = activeChallenge.duration_days ?? 40
     const diffDays = Math.floor(
-      (new Date(todayStr + 'T00:00:00Z').getTime() - new Date(activeChallenge.start_date + 'T00:00:00Z').getTime()) /
+      (new Date(todayStr + 'T00:00:00Z').getTime() - new Date(activeStart + 'T00:00:00Z').getTime()) /
         86400000
     )
     const currentDay = diffDays + 1
 
-    if (currentDay <= 0 || currentDay > activeChallenge.duration_days) {
+    if (currentDay <= 0 || currentDay > activeDuration) {
       return {
         success: true,
         skipped: true,
-        reason: `Current day ${currentDay} out of active range 1..${activeChallenge.duration_days}`,
+        reason: `Current day ${currentDay} out of active range 1..${activeDuration}`,
       }
     }
 

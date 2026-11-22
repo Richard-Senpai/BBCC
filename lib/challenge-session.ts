@@ -31,10 +31,11 @@ export async function getEffectiveChallenge(
   const supabase = await createClient()
   const cookieStore = await cookies()
 
-  // 1. Fetch all challenges ordered by start_date DESC (or challenges_with_status)
+  // 1. Fetch all daily challenges ordered by start_date DESC (or challenges_with_status)
   let { data: challenges, error } = await supabase
     .from('challenges')
     .select('*')
+    .eq('type', 'daily')
     .order('start_date', { ascending: false })
 
   if (error || !challenges || challenges.length === 0) {
@@ -83,8 +84,9 @@ export async function getEffectiveChallenge(
   const challengesWithStatus = challenges.map((c) => {
     const tz = c.timezone || 'Africa/Lagos'
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now)
-    const startStr = c.start_date
-    const endDateTime = new Date(new Date(c.start_date + 'T00:00:00Z').getTime() + (c.duration_days - 1) * 86400000)
+    const startStr = c.start_date || '2026-01-01'
+    const duration = c.duration_days ?? 40
+    const endDateTime = new Date(new Date(startStr + 'T00:00:00Z').getTime() + (duration - 1) * 86400000)
     const endStr = endDateTime.toISOString().split('T')[0]
 
     let status: ChallengeStatus = 'upcoming'
@@ -95,7 +97,7 @@ export async function getEffectiveChallenge(
       currentDay = 0
     } else if (todayStr > endStr) {
       status = 'completed'
-      currentDay = c.duration_days + 1
+      currentDay = duration + 1
     } else {
       status = 'active'
       const diffDays = Math.floor(
@@ -107,6 +109,8 @@ export async function getEffectiveChallenge(
 
     return {
       ...c,
+      duration_days: duration,
+      start_date: startStr,
       status,
       currentDay,
     }
@@ -145,7 +149,7 @@ export async function getEffectiveChallenge(
     }
   }
 
-  const durationDays = selected.duration_days
+  const durationDays = selected.duration_days ?? 40
   const challengeName = selected.name
   const challengeTitle = `${durationDays} Days of ${challengeName}`
   const enrollmentMode: EnrollmentMode = (selected.enrollment_mode as EnrollmentMode) || 'open'

@@ -520,15 +520,17 @@ export default function CurriculumArchitect({
     (n) => daysCache.has(n) && (daysCache.get(n)?.activities?.length ?? 0) > 0
   ).length
 
-  if (challenges.length === 0) {
+  const dailyChallenges = challenges.filter((c) => c.type !== 'course')
+
+  if (dailyChallenges.length === 0) {
     return (
       <section id="curriculum-architect" className="bg-[var(--bg-surface)] rounded-xl p-8 shadow-xs border border-[var(--border-hairline)] mt-6 text-center transition-colors">
         <div className="w-12 h-12 rounded-2xl bg-[var(--bg-subtle)] text-[var(--text-muted)] mx-auto flex items-center justify-center mb-3 border border-[var(--border-hairline)]">
           <Layers size={20} strokeWidth={1.75} />
         </div>
-        <h4 className="text-sm font-semibold text-[var(--text-ink)]">No Consecration Challenges Created</h4>
+        <h4 className="text-sm font-semibold text-[var(--text-ink)]">No Daily Consecration Cycles Created</h4>
         <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto mt-1 leading-relaxed">
-          Create a challenge above to start designing curriculum days, spiritual disciplines, and devotional scriptures.
+          Create a daily challenge above to start designing curriculum days, spiritual disciplines, and devotional scriptures. Courses are managed via the Course Outline Manager.
         </p>
       </section>
     )
@@ -537,19 +539,19 @@ export default function CurriculumArchitect({
   return (
     <section id="curriculum-architect" className="bg-[var(--bg-surface)] rounded-xl p-5 shadow-xs border border-[var(--border-hairline)] mt-6 transition-colors">
       {/* ── Challenge Scope Bar ── */}
-      {challenges.length > 0 && (
+      {dailyChallenges.length > 0 && (
         <div className="mb-5 pb-4 border-b border-[var(--border-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider flex items-center gap-1.5">
               <Layers size={14} className="text-[var(--flame-accent)]" />
-              <span>Editing Challenge:</span>
+              <span>Editing Daily Challenge:</span>
             </span>
             <select
               value={challengeId || ''}
               onChange={(e) => handleChallengeSelect(e.target.value)}
               className="px-3 py-1.5 text-xs font-semibold bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-hairline)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--flame-accent)] transition shadow-2xs cursor-pointer"
             >
-              {challenges.map((c) => (
+              {dailyChallenges.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} ({c.status.toUpperCase()} — {c.duration_days} Days)
                 </option>
@@ -576,11 +578,11 @@ export default function CurriculumArchitect({
             )}
           </div>
 
-          {challenges.length > 1 && (
+          {dailyChallenges.length > 1 && (
             <button
               type="button"
               onClick={() => {
-                const other = challenges.filter((c) => c.id !== challengeId)
+                const other = dailyChallenges.filter((c) => c.id !== challengeId)
                 if (other.length > 0) setSelectedSourceId(other[0].id)
                 setShowCopyModal(true)
               }}
