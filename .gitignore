@@ -20,9 +20,22 @@
 # production
 /build
 
-# misc
+# misc & secret keys
 .DS_Store
 *.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+*.pkcs12
+*id_rsa*
+*id_ed25519*
+*.secret
+*.secrets
+credentials.json
+service-account*.json
+serviceAccountKey*.json
 
 # debug
 npm-debug.log*
@@ -30,8 +43,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env*.example
+!.env.example
 
 # vercel
 .vercel
