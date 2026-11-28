@@ -35,7 +35,7 @@ export default async function CourseCompletedPage({ params }: PageProps) {
     .select('*', { count: 'exact', head: true })
     .eq('challenge_id', id)
 
-  const courseTitle = course?.name || 'Self-Paced Course'
+  const courseTitle = course?.name || 'Course'
 
   return (
     <div className="min-h-screen bg-[var(--bg-canvas)] flex items-center justify-center p-4 py-12 transition-colors">

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { SELECTED_CHALLENGE_COOKIE } from '@/lib/challenge-session'
 import type {
@@ -208,7 +209,7 @@ export async function getAdminChallenges(): Promise<ChallengeWithStats[]> {
 }
 
 /**
- * Create a new challenge (Daily Consecration Cycle or Self-Paced Course).
+ * Create a new challenge (Daily Consecration Cycle or Course).
  */
 export async function createChallenge(params: {
   name: string
@@ -1272,6 +1273,26 @@ export async function saveLessonContent(params: {
     }
 
     // 4. Sanitize and prepare blocks to save
+    for (const b of blocks) {
+      if (b.type === 'link') {
+        const rawUrl = typeof b.content?.url === 'string' ? b.content.url.trim() : ''
+        if (rawUrl) {
+          const lower = rawUrl.toLowerCase()
+          if (
+            lower.startsWith('javascript:') ||
+            lower.startsWith('data:') ||
+            lower.startsWith('vbscript:') ||
+            lower.startsWith('file:')
+          ) {
+            return {
+              success: false,
+              error: 'Invalid link scheme. Only web addresses (http:// or https://) are allowed.',
+            }
+          }
+        }
+      }
+    }
+
     const preparedBlocks = blocks.map((b, index) => {
       const blockContent = { ...(b.content || {}) }
 
@@ -1280,10 +1301,20 @@ export async function saveLessonContent(params: {
         blockContent.html = sanitizeHtml(blockContent.html)
       } else if (b.type === 'image_text' && typeof blockContent.html === 'string') {
         blockContent.html = sanitizeHtml(blockContent.html)
+      } else if (b.type === 'link' && typeof blockContent.url === 'string') {
+        const trimmed = blockContent.url.trim()
+        if (trimmed) {
+          blockContent.url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+        } else {
+          blockContent.url = ''
+        }
       }
 
+      // Guarantee an assigned UUID for every block so PostgREST never inserts id: NULL
+      const blockId = b.id && !b.id.startsWith('temp_') ? b.id : randomUUID()
+
       return {
-        ...(b.id ? { id: b.id } : {}),
+        id: blockId,
         lesson_id: lessonId,
         position: index + 1,
         type: b.type,
@@ -2028,13 +2059,37 @@ export async function updateChallengeSettings(
   startDate: string | null,
   timezone = 'Africa/Lagos',
   durationDays = 40,
-  challengeName = 'Overcomer'
+  challengeName = 'Overcomer',
+  challengeId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { supabase } = await assertAdmin()
 
-    // Use update() (not upsert) — row id=1 is guaranteed to exist.
-    const { error } = await supabase
+    // 1. If challengeId provided, or if active challenge exists, update challenges table directly
+    let targetId = challengeId
+    if (!targetId) {
+      const { data: activeC } = await supabase
+        .from('challenges')
+        .select('id')
+        .eq('type', 'daily')
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      targetId = activeC?.id
+    }
+
+    if (targetId) {
+      const res = await updateChallenge(targetId, {
+        name: challengeName.trim() || 'Overcomer',
+        durationDays: Math.max(1, Math.min(365, durationDays)),
+        startDate: startDate || undefined,
+        timezone: timezone || 'Africa/Lagos',
+      })
+      if (!res.success) return res
+    }
+
+    // 2. Keep challenge_settings id=1 in sync as legacy mirror
+    await supabase
       .from('challenge_settings')
       .update({
         start_date: startDate || null,
@@ -2045,11 +2100,6 @@ export async function updateChallengeSettings(
       })
       .eq('id', 1)
 
-    if (error) {
-      console.error('[updateChallengeSettings] Supabase error:', error)
-      return { success: false, error: `Failed to save settings: ${error.message}` }
-    }
-
     revalidatePath('/admin', 'page')
     revalidatePath('/admin', 'layout')
     revalidatePath('/dashboard', 'page')
@@ -2057,6 +2107,7 @@ export async function updateChallengeSettings(
     revalidatePath('/dashboard/progress', 'page')
     revalidatePath('/leaderboard', 'page')
     revalidatePath('/community', 'page')
+    revalidatePath('/home')
 
     return { success: true }
   } catch (err) {
@@ -2310,7 +2361,7 @@ export async function getChallengeDay(dayNumber: number, challengeId?: string) {
  * Initialize / quick-populate all challenge days with default templates
  * if they don't already exist, up to duration_days from settings.
  */
-export async function seedChallengeDays(): Promise<{
+export async function seedChallengeDays(targetChallengeId?: string): Promise<{
   success: boolean
   error?: string
   count?: number
@@ -2318,26 +2369,59 @@ export async function seedChallengeDays(): Promise<{
   try {
     const { supabase } = await assertAdmin()
 
-    const { data: settings } = await supabase
-      .from('challenge_settings')
-      .select('duration_days, challenge_name')
-      .eq('id', 1)
-      .single()
+    let challengeId = targetChallengeId
+    let dur = 40
+    let cname = 'Overcomer'
 
-    const dur = settings?.duration_days ?? 40
-    const cname = settings?.challenge_name ?? 'Overcomer'
+    if (challengeId) {
+      const { data: chal } = await supabase
+        .from('challenges')
+        .select('id, name, duration_days')
+        .eq('id', challengeId)
+        .maybeSingle()
+      if (chal) {
+        dur = chal.duration_days ?? 40
+        cname = chal.name || 'Overcomer'
+      }
+    } else {
+      const { data: chal } = await supabase
+        .from('challenges')
+        .select('id, name, duration_days')
+        .eq('type', 'daily')
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (chal) {
+        challengeId = chal.id
+        dur = chal.duration_days ?? 40
+        cname = chal.name || 'Overcomer'
+      } else {
+        const { data: settings } = await supabase
+          .from('challenge_settings')
+          .select('duration_days, challenge_name')
+          .eq('id', 1)
+          .single()
+        dur = settings?.duration_days ?? 40
+        cname = settings?.challenge_name ?? 'Overcomer'
+      }
+    }
 
     for (let i = 1; i <= dur; i++) {
+      const dayPayload: Record<string, unknown> = {
+        day_number: i,
+        title: `Day ${i}: Consecration & Spiritual Discipline`,
+        description: `Daily devotional focus and prayer alignment for Day ${i} of the ${dur} Days of ${cname} Challenge.`,
+        scripture_reference: 'Galatians 5:16-25 & Romans 8:1-14',
+      }
+      if (challengeId) {
+        dayPayload.challenge_id = challengeId
+      }
+
       const { data: dayRow, error: dayError } = await supabase
         .from('challenge_days')
         .upsert(
-          {
-            day_number: i,
-            title: `Day ${i}: Consecration & Spiritual Discipline`,
-            description: `Daily devotional focus and prayer alignment for Day ${i} of the ${dur} Days of ${cname} Challenge.`,
-            scripture_reference: 'Galatians 5:16-25 & Romans 8:1-14',
-          },
-          { onConflict: 'day_number' }
+          dayPayload as any,
+          { onConflict: challengeId ? 'challenge_id,day_number' : 'day_number' }
         )
         .select('id')
         .single()

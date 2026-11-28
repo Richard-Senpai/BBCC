@@ -9,11 +9,13 @@ import {
   Flame,
   Calendar,
   UserCheck,
+  BookOpen,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import BBCCLogo from '@/components/BBCCLogo'
 import ThemeToggle from '@/components/ThemeToggle'
 import LogoutButton from '@/components/LogoutButton'
+import AdminChallengeSelector from '@/components/admin/AdminChallengeSelector'
 import ChallengesManager from '@/components/admin/ChallengesManager'
 import ScheduleSettingsCard from '@/components/admin/ScheduleSettingsCard'
 import CurriculumArchitect from '@/components/admin/CurriculumArchitect'
@@ -74,6 +76,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     daysQuery = daysQuery.eq('challenge_id', targetChallengeId)
   }
 
+  let completionsQuery = supabase
+    .from('completions')
+    .select('user_id, challenge_day_id, completed_at, challenge_days!inner(challenge_id)')
+
+  if (targetChallengeId) {
+    completionsQuery = completionsQuery.eq('challenge_days.challenge_id', targetChallengeId)
+  }
+
   const [
     settingsRes,
     daysRes,
@@ -95,9 +105,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false }),
-    supabase
-      .from('completions')
-      .select('user_id, challenge_day_id, completed_at'),
+    completionsQuery,
     supabase
       .from('announcements')
       .select('id, title, body, created_by, created_at, profiles(full_name, avatar_url, role)')
@@ -128,7 +136,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         (a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
       )[0]
 
-      const statsRes = await supabase.rpc('get_member_stats', { member_id: m.id })
+      const statsRes = targetChallengeId
+        ? await supabase.rpc('get_member_stats', { member_id: m.id, target_challenge_id: targetChallengeId })
+        : await supabase.rpc('get_member_stats', { member_id: m.id })
       const stats = (statsRes.data as { current_streak: number; longest_run: number }[] | null)?.[0] ?? {
         current_streak: 0,
         longest_run: 0,
@@ -195,7 +205,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </span>
               </div>
               <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                {durationDays} Days of {challengeName} — Pastoral Administration
+                {selectedChallenge?.type === 'course'
+                  ? `Course: ${challengeName} — Pastoral Administration`
+                  : `${durationDays} Days of ${challengeName} — Pastoral Administration`}
               </p>
             </div>
           </div>
@@ -295,80 +307,172 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         )}
 
+        {/* ── Challenge Scope & Live Synchronization Readout ─────────── */}
+        <div className="mb-6">
+          <AdminChallengeSelector
+            challenges={adminChallenges}
+            selectedChallengeId={targetChallengeId ?? ''}
+          />
+        </div>
+
         {/* ── 4 Stat Summary Cards ────────────────────────────── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Card 1: Curriculum Readiness */}
-          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
-            <div>
-              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                Curriculum Readiness
-              </p>
-              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
-                {readyDaysCount} / {durationDays} <span className="text-xs font-normal text-[var(--text-muted)]">Days</span>
-              </p>
-              <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
-                {readinessPct}% Complete ({Math.max(0, durationDays - readyDaysCount)} Remaining)
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-hairline)] flex items-center justify-center font-bold text-[var(--flame-accent)] text-xs">
-              {readinessPct}%
-            </div>
-          </div>
+          {selectedChallenge?.type === 'course' ? (
+            <>
+              {/* Card 1: Curriculum Depth */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Curriculum Depth
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {selectedChallenge.lesson_count ?? 0} <span className="text-xs font-normal text-[var(--text-muted)]">Lessons</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
+                    {selectedChallenge.is_published ? 'Published & Active' : 'Draft in Progress'}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-hairline)] flex items-center justify-center font-bold text-[var(--flame-accent)] text-xs">
+                  <BookOpen size={16} strokeWidth={1.75} />
+                </div>
+              </div>
 
-          {/* Card 2: Active Members */}
-          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
-            <div>
-              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                Active Church Members
-              </p>
-              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
-                {totalEnrolled} <span className="text-xs font-normal text-[var(--text-muted)]">Enrolled</span>
-              </p>
-              <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
-                All Active in Cohort
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
-              <Users size={16} strokeWidth={1.75} />
-            </div>
-          </div>
+              {/* Card 2: Enrolled Students */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Enrolled Students
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {selectedChallenge.participant_count ?? 0} <span className="text-xs font-normal text-[var(--text-muted)]">Enrolled</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
+                    {selectedChallenge.members_started ?? 0} Active Learners
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
+                  <Users size={16} strokeWidth={1.75} />
+                </div>
+              </div>
 
-          {/* Card 3: Collective Streak */}
-          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
-            <div>
-              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                Collective Church Streak
-              </p>
-              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
-                {avgStreak} <span className="text-xs font-normal text-[var(--text-muted)]">Days Avg.</span>
-              </p>
-              <p className="text-[10px] text-[var(--flame-accent)] font-medium mt-0.5">
-                High Spiritual Adherence
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center border border-[var(--border-hairline)]">
-              <Flame size={16} strokeWidth={1.75} />
-            </div>
-          </div>
+              {/* Card 3: Completions */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Completions
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {selectedChallenge.members_completed ?? 0} <span className="text-xs font-normal text-[var(--text-muted)]">Finished</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--flame-accent)] font-medium mt-0.5">
+                    {selectedChallenge.participant_count
+                      ? `${Math.round(((selectedChallenge.members_completed ?? 0) / selectedChallenge.participant_count) * 100)}% Rate`
+                      : 'No completions yet'}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center border border-[var(--border-hairline)]">
+                  <Flame size={16} strokeWidth={1.75} />
+                </div>
+              </div>
 
-          {/* Card 4: Challenge Timeline */}
-          <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
-            <div>
-              <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                Challenge Timeline
-              </p>
-              <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
-                Day {currentDay > 0 ? currentDay : 0}{' '}
-                <span className="text-xs font-normal text-[var(--text-muted)]">of {durationDays}</span>
-              </p>
-              <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
-                Ends {endDateStr}
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
-              <Calendar size={16} strokeWidth={1.75} />
-            </div>
-          </div>
+              {/* Card 4: Access Policy */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Access Policy
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {selectedChallenge.access_mode === 'unlimited'
+                      ? 'Unlimited'
+                      : selectedChallenge.access_mode === 'fixed_end'
+                      ? 'Fixed End'
+                      : `${selectedChallenge.access_days ?? 0} Days`}
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+                    {selectedChallenge.enrollment_mode === 'approval' ? 'Approval Required' : 'Open Access'}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
+                  <Calendar size={16} strokeWidth={1.75} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Card 1: Curriculum Readiness */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Curriculum Readiness
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {readyDaysCount} / {durationDays} <span className="text-xs font-normal text-[var(--text-muted)]">Days</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
+                    {readinessPct}% Complete ({Math.max(0, durationDays - readyDaysCount)} Remaining)
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-hairline)] flex items-center justify-center font-bold text-[var(--flame-accent)] text-xs">
+                  {readinessPct}%
+                </div>
+              </div>
+
+              {/* Card 2: Active Members */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Active Church Members
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {totalEnrolled} <span className="text-xs font-normal text-[var(--text-muted)]">Enrolled</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--olive-accent)] font-medium mt-0.5">
+                    All Active in Cohort
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
+                  <Users size={16} strokeWidth={1.75} />
+                </div>
+              </div>
+
+              {/* Card 3: Collective Streak */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Collective Church Streak
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    {avgStreak} <span className="text-xs font-normal text-[var(--text-muted)]">Days Avg.</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--flame-accent)] font-medium mt-0.5">
+                    High Spiritual Adherence
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--flame-accent)] flex items-center justify-center border border-[var(--border-hairline)]">
+                  <Flame size={16} strokeWidth={1.75} />
+                </div>
+              </div>
+
+              {/* Card 4: Challenge Timeline */}
+              <div className="bg-[var(--bg-surface)] rounded-xl p-4 shadow-xs border border-[var(--border-hairline)] flex items-center justify-between transition-colors">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Challenge Timeline
+                  </p>
+                  <p className="text-lg font-bold tracking-tight text-[var(--text-ink)] mt-1">
+                    Day {currentDay > 0 ? currentDay : 0}{' '}
+                    <span className="text-xs font-normal text-[var(--text-muted)]">of {durationDays}</span>
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+                    Ends {endDateStr}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-[var(--bg-subtle)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-hairline)]">
+                  <Calendar size={16} strokeWidth={1.75} />
+                </div>
+              </div>
+            </>
+          )}
         </section>
 
         {/* ── Section 0: Challenges Manager ─────────────────────── */}
@@ -382,7 +486,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {/* ── Section 1: Schedule Settings ────────────────────── */}
         <div className="mt-6">
           <ScheduleSettingsCard
-            settings={settings}
+            challenge={selectedChallenge}
+            allChallenges={adminChallenges}
             hasChallengeDays={days.length > 0}
             existingDaysCount={days.length}
           />
@@ -402,18 +507,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         {/* ── Section 2: Curriculum Matrix & Architect ─── */}
-        <div className="mt-6">
-          <CurriculumArchitect
-            days={days}
-            completionCounts={completionCounts}
-            startDate={startDateStr}
-            durationDays={durationDays}
-            challengeName={challengeName}
-            challengeId={targetChallengeId}
-            challenges={adminChallenges}
-            challengeStatus={selectedChallenge?.status !== 'course' ? selectedChallenge?.status : undefined}
-          />
-        </div>
+        {selectedChallenge?.type !== 'course' && (
+          <div className="mt-6">
+            <CurriculumArchitect
+              days={days}
+              completionCounts={completionCounts}
+              startDate={startDateStr}
+              durationDays={durationDays}
+              challengeName={challengeName}
+              challengeId={targetChallengeId}
+              challenges={adminChallenges}
+              challengeStatus={selectedChallenge?.status !== 'course' ? selectedChallenge?.status : undefined}
+            />
+          </div>
+        )}
 
         {/* ── Section 3: Fellowship Member Roster ──────────────── */}
         <div className="mt-6">

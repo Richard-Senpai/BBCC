@@ -156,7 +156,7 @@ export default function CourseOutlineView({
             <div className="flex items-center gap-2 flex-wrap text-xs">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 text-[11px]">
                 <BookOpen size={11} strokeWidth={2.2} />
-                <span>Self-Paced Course · {totalCount} Lessons</span>
+                <span>Course · {totalCount} Lessons</span>
               </span>
 
               {course.enrollment_mode === 'approval' && (

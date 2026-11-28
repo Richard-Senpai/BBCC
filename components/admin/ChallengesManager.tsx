@@ -207,7 +207,7 @@ export default function ChallengesManager({
           }`}
         >
           <GraduationCap size={13} strokeWidth={2} />
-          <span>Self-Paced Courses ({courseCount})</span>
+          <span>Courses ({courseCount})</span>
         </button>
       </div>
 
@@ -236,14 +236,14 @@ export default function ChallengesManager({
           </div>
           <h4 className="text-sm font-semibold text-[var(--text-ink)]">
             {typeFilter === 'course'
-              ? 'No Self-Paced Courses Found'
+              ? 'No Courses Found'
               : typeFilter === 'daily'
               ? 'No Daily Consecration Challenges Found'
               : 'No Challenges Found'}
           </h4>
           <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto mt-1 mb-4 leading-relaxed">
             {typeFilter === 'course'
-              ? 'Create a self-paced course to build modular, sequential spiritual curriculums.'
+              ? 'Create a course to build modular, sequential spiritual curriculums.'
               : 'Create a challenge to start scheduling corporate prayer and fasting.'}
           </p>
           <button
@@ -785,7 +785,7 @@ function CreateChallengeModal({
             </div>
             <div>
               <h3 className="text-base font-semibold text-[var(--text-ink)] font-serif">
-                {challengeType === 'course' ? 'Create Self-Paced Course' : 'Initiate New Consecration Cycle'}
+                {challengeType === 'course' ? 'Create Course' : 'Initiate New Consecration Cycle'}
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
                 {challengeType === 'course'
@@ -852,10 +852,10 @@ function CreateChallengeModal({
               <div>
                 <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--text-ink)]">
                   <GraduationCap size={14} className="text-purple-600 dark:text-purple-400" />
-                  <span>Self-Paced Course</span>
+                  <span>Course</span>
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-snug">
-                  Sequential lessons, no calendar dates, no streaks, no daily push. Self-paced progression.
+                  Sequential lessons, no calendar dates, no streaks, no daily push. Flexible progression.
                 </p>
               </div>
               <span className={`text-[10px] font-bold mt-2 inline-flex items-center gap-1 ${
@@ -989,7 +989,7 @@ function CreateChallengeModal({
               </div>
             </>
           ) : (
-            /* ── Self-Paced Course Form ── */
+            /* ── Course Form ── */
             <>
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-ink)] mb-1">

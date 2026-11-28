@@ -441,7 +441,7 @@ export default function ChallengeHubView({
           )}
         </section>
 
-        {/* ── SECTION: SELF-PACED COURSES ───────────────────── */}
+        {/* ── SECTION: COURSES ───────────────────────────────── */}
         <MemberCoursesSection courses={courses} profile={profile} />
 
         {/* ── SECTION 2: UPCOMING CHALLENGES ─────────────────── */}

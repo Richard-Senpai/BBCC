@@ -70,12 +70,12 @@ export default function MemberCoursesSection({
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider flex items-center gap-1.5">
             <GraduationCap size={15} className="text-purple-600 dark:text-purple-400" />
-            <span>Self-Paced Courses</span>
+            <span>Courses</span>
           </h2>
         </div>
         <div className="bg-[var(--bg-surface)] rounded-2xl p-5 border border-dashed border-[var(--border-subtle)] text-center">
           <p className="text-xs text-[var(--text-muted)] italic">
-            No self-paced courses are currently available. Check back soon for new curriculum offerings.
+            No courses are currently available. Check back soon for new curriculum offerings.
           </p>
         </div>
       </section>
@@ -88,7 +88,7 @@ export default function MemberCoursesSection({
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold text-[var(--text-ink)] uppercase tracking-wider flex items-center gap-1.5">
           <GraduationCap size={15} className="text-purple-600 dark:text-purple-400" />
-          <span>Self-Paced Courses</span>
+          <span>Courses</span>
         </h2>
         <span className="text-[11px] font-medium text-[var(--text-muted)]">
           {courses.length} Course{courses.length === 1 ? '' : 's'} Available

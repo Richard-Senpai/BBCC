@@ -123,6 +123,21 @@ export function LessonContentEditorModal({
       return
     }
 
+    // Check for any link blocks with invalid schemes before saving
+    for (const b of curBlocks) {
+      if (b.type === 'link') {
+        const raw = typeof b.content?.url === 'string' ? b.content.url.trim() : ''
+        if (raw) {
+          const val = validateButtonLinkUrl(raw)
+          if (!val.valid) {
+            setSaveState('failed')
+            setSaveError(val.error || 'That link isn’t a valid web address')
+            return
+          }
+        }
+      }
+    }
+
     setSaveState('saving')
     setSaveError(null)
 
@@ -131,13 +146,22 @@ export function LessonContentEditorModal({
         lessonId: activeLessonId,
         title: curTitle,
         summary: curSummary,
-        blocks: curBlocks.map((b, index) => ({
-          id: b.id.startsWith('temp_') ? undefined : b.id,
-          position: index + 1,
-          type: b.type,
-          content: b.content,
-          required: Boolean(b.required),
-        })),
+        blocks: curBlocks.map((b, index) => {
+          const contentCopy = { ...(b.content || {}) }
+          if (b.type === 'link' && typeof contentCopy.url === 'string') {
+            const trimmed = contentCopy.url.trim()
+            if (trimmed) {
+              contentCopy.url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+            }
+          }
+          return {
+            id: b.id.startsWith('temp_') ? undefined : b.id,
+            position: index + 1,
+            type: b.type,
+            content: contentCopy,
+            required: Boolean(b.required),
+          }
+        }),
       })
 
       if (res.success && res.blocks) {
@@ -417,7 +441,7 @@ export function LessonContentEditorModal({
             )}
 
             {/* Autosave Status Pill */}
-            <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
               {saveState === 'saving' && (
                 <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -431,14 +455,19 @@ export function LessonContentEditorModal({
                 </span>
               )}
               {saveState === 'failed' && (
-                <button
-                  type="button"
-                  onClick={executeSave}
-                  className="flex items-center gap-1 text-red-600 dark:text-red-400 hover:underline cursor-pointer"
-                >
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>Failed, tap to retry</span>
-                </button>
+                <div className="flex items-center gap-1 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-900/50">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="font-medium truncate max-w-[120px] sm:max-w-[280px]" title={saveError || 'Save failed'}>
+                    {saveError || 'Save failed'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={executeSave}
+                    className="font-bold underline hover:opacity-85 cursor-pointer ml-1 text-red-700 dark:text-red-300 shrink-0"
+                  >
+                    Retry
+                  </button>
+                </div>
               )}
               {saveState === 'unsaved' && (
                 <span className="text-stone-400 dark:text-stone-500">Unsaved changes</span>
@@ -1099,15 +1128,19 @@ function LinkBlockEditor({
   const [urlError, setUrlError] = useState<string | null>(null)
 
   const handleUrlBlur = () => {
-    if (!content.url) {
+    const raw = (content.url || '').trim()
+    if (!raw) {
       setUrlError('URL is required')
       return
     }
-    const val = validateButtonLinkUrl(content.url)
+    const val = validateButtonLinkUrl(raw)
     if (!val.valid) {
-      setUrlError(val.error || 'Invalid link')
+      setUrlError(val.error || 'That link isn’t a valid web address.')
     } else {
       setUrlError(null)
+      if (val.normalizedUrl && val.normalizedUrl !== content.url) {
+        onUpdate({ url: val.normalizedUrl })
+      }
     }
   }
 

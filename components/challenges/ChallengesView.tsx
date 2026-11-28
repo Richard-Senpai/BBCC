@@ -18,6 +18,8 @@ import {
   AlertCircle,
   Loader2,
   UserPlus,
+  Search,
+  X,
 } from 'lucide-react'
 import AppTopBar from '@/components/AppTopBar'
 import { setSessionChallenge, requestChallengeEnrollment, type HubChallengeItem, type HubDataResponse } from '@/lib/actions/challenges'
@@ -102,6 +104,17 @@ export default function ChallengesView({
       ? initialFilter
       : 'all'
   )
+
+  const initialSearch = searchParams?.get('search') || searchParams?.get('q') || ''
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
+  const [debouncedQuery, setDebouncedQuery] = useState(initialSearch)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const [requestingId, setRequestingId] = useState<string | null>(null)
   const [startingId, setStartingId] = useState<string | null>(null)
@@ -188,7 +201,7 @@ export default function ChallengesView({
       })
     }
 
-    // B. Self-Paced Courses
+    // B. Courses
     for (const c of courses) {
       const isCreatedRecently =
         c.created_at && now.getTime() - new Date(c.created_at).getTime() < fourteenDaysMs
@@ -268,6 +281,16 @@ export default function ChallengesView({
       result = unifiedItems.filter((item) => item.state === 'completed')
     }
 
+    // B. Apply search query (case-insensitive, matching partial words across title & description)
+    const normalized = debouncedQuery.trim().toLowerCase()
+    if (normalized) {
+      const searchWords = normalized.split(/\s+/).filter(Boolean)
+      result = result.filter((item) => {
+        const fullContent = `${item.title} ${item.description || ''}`.toLowerCase()
+        return searchWords.every((w) => fullContent.includes(w))
+      })
+    }
+
     // Sort order:
     // 1: In progress, 2: Available/New, 3: Upcoming, 4: Completed, 5: Expired
     return [...result].sort((a, b) => {
@@ -276,7 +299,7 @@ export default function ChallengesView({
       }
       return a.title.localeCompare(b.title)
     })
-  }, [unifiedItems, filter])
+  }, [unifiedItems, filter, debouncedQuery])
 
   // 3. Actions
   async function handleOpenDailyChallenge(challengeId: string) {
@@ -323,8 +346,38 @@ export default function ChallengesView({
           unreadAnnouncementsCount={unreadCount}
         />
 
+        {/* Search Bar (Above filter chips) */}
+        <div className="px-4 pt-3 pb-1">
+          <div className="relative">
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search challenges and courses by name or topic…"
+              className="w-full pl-9 pr-8 py-2 text-xs bg-[var(--bg-surface)] text-[var(--text-ink)] rounded-xl border border-[var(--border-hairline)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--flame-accent)] focus:ring-1 focus:ring-[var(--flame-accent)] transition shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('')
+                  setDebouncedQuery('')
+                }}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-ink)] p-0.5 rounded-full hover:bg-[var(--bg-subtle)] transition cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Filter Chips Bar */}
-        <div className="px-4 pt-3 pb-2 sticky top-[61px] z-30 bg-[var(--bg-canvas)]/90 backdrop-blur-md transition-colors border-b border-[var(--border-hairline)]">
+        <div className="px-4 pt-2 pb-2 sticky top-[61px] z-30 bg-[var(--bg-canvas)]/90 backdrop-blur-md transition-colors border-b border-[var(--border-hairline)]">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             {(
               [
@@ -373,19 +426,42 @@ export default function ChallengesView({
         {/* Challenge & Course Cards List */}
         <div className="px-4 pt-3 space-y-3">
           {filteredItems.length === 0 ? (
-            <div className="my-10 text-center py-10 px-4 bg-[var(--bg-surface)] rounded-2xl border border-dashed border-[var(--border-hairline)]">
-              <BookOpen size={24} className="mx-auto text-[var(--text-muted)] mb-2" />
-              <h3 className="text-sm font-semibold text-[var(--text-ink)]">
-                No challenges found
-              </h3>
-              <p className="text-xs text-[var(--text-muted)] mt-1 max-w-xs mx-auto">
-                {filter === 'completed'
-                  ? 'You have not completed any challenges or courses yet.'
-                  : filter === 'my'
-                  ? 'You have not joined any challenges or courses yet.'
-                  : 'Check back soon for upcoming consecrations and courses.'}
-              </p>
-            </div>
+            debouncedQuery.trim() ? (
+              <div className="my-10 text-center py-10 px-4 bg-[var(--bg-surface)] rounded-2xl border border-dashed border-[var(--border-hairline)]">
+                <Search size={24} className="mx-auto text-[var(--text-muted)] mb-2" />
+                <h3 className="text-sm font-semibold text-[var(--text-ink)]">
+                  No results for &ldquo;{debouncedQuery.trim()}&rdquo;
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1 max-w-xs mx-auto">
+                  Try checking your spelling or searching for a different keyword.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setDebouncedQuery('')
+                  }}
+                  className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--bg-subtle)] text-[var(--text-ink)] border border-[var(--border-hairline)] hover:bg-[var(--border-hairline)] transition shadow-2xs cursor-pointer"
+                >
+                  <X size={13} />
+                  <span>Clear search</span>
+                </button>
+              </div>
+            ) : (
+              <div className="my-10 text-center py-10 px-4 bg-[var(--bg-surface)] rounded-2xl border border-dashed border-[var(--border-hairline)]">
+                <BookOpen size={24} className="mx-auto text-[var(--text-muted)] mb-2" />
+                <h3 className="text-sm font-semibold text-[var(--text-ink)]">
+                  No challenges found
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1 max-w-xs mx-auto">
+                  {filter === 'completed'
+                    ? 'You have not completed any challenges or courses yet.'
+                    : filter === 'my'
+                    ? 'You have not joined any challenges or courses yet.'
+                    : 'Check back soon for upcoming consecrations and courses.'}
+                </p>
+              </div>
+            )
           ) : (
             filteredItems.map((item) => {
               const isDaily = item.type === 'daily'
@@ -493,7 +569,7 @@ export default function ChallengesView({
                     <span className="text-[11px] text-[var(--text-muted)] font-medium">
                       {isDaily
                         ? `${item.durationDays} Days Duration`
-                        : `${item.totalLessons || 0} Lessons · Self-paced`}
+                        : `${item.totalLessons || 0} Lessons`}
                     </span>
 
                     {/* Action Button depending on state */}

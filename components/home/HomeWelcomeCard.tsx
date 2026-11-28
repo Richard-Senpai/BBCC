@@ -18,7 +18,7 @@ export default function HomeWelcomeCard({ firstName }: HomeWelcomeCardProps) {
         </h2>
 
         <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto leading-relaxed mb-5">
-          We are delighted to walk this consecrated path with you. Join an active community challenge or enroll in a self-paced spiritual course to begin your journey.
+          We are delighted to walk this consecrated path with you. Join an active community challenge or enroll in a course to begin your journey.
         </p>
 
         <Link

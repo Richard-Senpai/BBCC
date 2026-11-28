@@ -256,10 +256,20 @@ function LinkButtonBlock({
 
   if (!content || !content.url) return null
 
-  // Ensure URL is strictly http:// or https://
-  const safeUrl = content.url.trim().startsWith('http://') || content.url.trim().startsWith('https://')
-    ? content.url.trim()
-    : null
+  // Ensure URL is strictly http:// or https:// (auto-prepend https:// if scheme was omitted)
+  let safeUrl: string | null = null
+  const rawUrl = (content.url || '').trim()
+  if (rawUrl) {
+    const withScheme = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
+    try {
+      const parsed = new URL(withScheme)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        safeUrl = parsed.toString()
+      }
+    } catch {
+      safeUrl = null
+    }
+  }
 
   if (!safeUrl) return null
 

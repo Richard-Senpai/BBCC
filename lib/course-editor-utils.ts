@@ -243,27 +243,66 @@ export function extractYouTubeVideoId(inputUrl: string): YouTubeParseResult {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. LINK BUTTON URL VALIDATOR
+// 3. LINK BUTTON URL VALIDATOR & NORMALIZER
 // ─────────────────────────────────────────────────────────────
 
-export function validateButtonLinkUrl(url: string): { valid: boolean; error?: string } {
+export function normalizeAndValidateLinkUrl(url: string): {
+  valid: boolean
+  normalizedUrl: string
+  error?: string
+} {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    return { valid: false, error: 'URL cannot be empty.' }
+    return { valid: false, normalizedUrl: '', error: 'URL cannot be empty.' }
   }
 
-  const trimmed = url.trim().toLowerCase()
-  if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) {
-    return { valid: false, error: 'Invalid URL scheme. Only http:// or https:// links are permitted.' }
+  const trimmed = url.trim()
+  const lower = trimmed.toLowerCase()
+
+  // Strict rejection of unsafe scripting schemes
+  if (
+    lower.startsWith('javascript:') ||
+    lower.startsWith('data:') ||
+    lower.startsWith('vbscript:') ||
+    lower.startsWith('file:')
+  ) {
+    return {
+      valid: false,
+      normalizedUrl: '',
+      error: 'Invalid link scheme. Only web addresses (http:// or https://) are allowed.',
+    }
   }
 
-  if (!/^https?:\/\//i.test(url.trim())) {
-    return { valid: false, error: 'URL must start with http:// or https://' }
-  }
+  // Be forgiving: If no scheme is present, auto-prepend https://
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
 
   try {
-    new URL(url.trim())
-    return { valid: true }
+    const parsed = new URL(withScheme)
+    // Accept only http and https protocols
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return {
+        valid: false,
+        normalizedUrl: '',
+        error: 'Only http:// and https:// links are supported.',
+      }
+    }
+
+    // Ensure valid hostname with at least a dot (or localhost)
+    if (!parsed.hostname || (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost')) {
+      return {
+        valid: false,
+        normalizedUrl: '',
+        error: 'That link isn’t a valid web address.',
+      }
+    }
+
+    return { valid: true, normalizedUrl: withScheme }
   } catch {
-    return { valid: false, error: 'Please enter a well-formed web address.' }
+    return { valid: false, normalizedUrl: '', error: 'That link isn’t a valid web address.' }
   }
 }
+
+export function validateButtonLinkUrl(url: string): { valid: boolean; normalizedUrl?: string; error?: string } {
+  const result = normalizeAndValidateLinkUrl(url)
+  return { valid: result.valid, normalizedUrl: result.normalizedUrl, error: result.error }
+}
+

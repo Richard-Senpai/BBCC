@@ -151,7 +151,7 @@ export default function HomeHeroCard({ heroData }: HomeHeroCardProps) {
           Spiritual Consecration Awaits
         </h2>
         <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto leading-relaxed mb-4">
-          Discover daily challenges and self-paced courses designed to deepen your spiritual walk.
+          Discover daily challenges and courses designed to deepen your spiritual walk.
         </p>
         <Link
           href="/challenges"

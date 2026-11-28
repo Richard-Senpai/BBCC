@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getEffectiveChallenge } from '@/lib/challenge-session'
 import CommunityChat from '@/components/community/CommunityChat'
 import type { MessageWithSender, Profile } from '@/lib/types'
 
@@ -16,11 +17,10 @@ export default async function CommunityPage() {
     redirect('/login')
   }
 
-  // Parallel fetches for user profile, settings, current day number, and initial messages
-  const [profileRes, settingsRes, currentDayRes, messagesRes] = await Promise.all([
+  // Parallel fetches for user profile, effective challenge, and initial messages
+  const [profileRes, challengeCtx, messagesRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('challenge_settings').select('*').eq('id', 1).single(),
-    supabase.rpc('get_current_challenge_day'),
+    getEffectiveChallenge(),
     supabase
       .from('messages')
       .select('id, user_id, content, image_url, created_at, profiles(id, full_name, avatar_url, fellowship_unit, role, display_tag)')
@@ -38,10 +38,9 @@ export default async function CommunityPage() {
     redirect('/pending')
   }
 
-  const settings = settingsRes.data
-  const durationDays = settings?.duration_days ?? 40
-  const challengeName = settings?.challenge_name ?? 'Overcomer'
-  const currentDay = (currentDayRes.data as number) ?? 0
+  const durationDays = challengeCtx.durationDays
+  const challengeName = challengeCtx.challengeName
+  const currentDay = challengeCtx.currentDay
 
   let initialMessages: MessageWithSender[] = []
   if (messagesRes.data) {

@@ -33,16 +33,32 @@ export default function SignupPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase
-      .from('challenge_settings')
-      .select('duration_days, challenge_name')
-      .eq('id', 1)
-      .single()
+      .from('challenges')
+      .select('duration_days, name')
+      .eq('type', 'daily')
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setChallengeBranding({
             duration_days: data.duration_days ?? 40,
-            challenge_name: data.challenge_name ?? 'Overcomer',
+            challenge_name: data.name ?? 'Overcomer',
           })
+        } else {
+          supabase
+            .from('challenge_settings')
+            .select('duration_days, challenge_name')
+            .eq('id', 1)
+            .single()
+            .then(({ data: legacy }) => {
+              if (legacy) {
+                setChallengeBranding({
+                  duration_days: legacy.duration_days ?? 40,
+                  challenge_name: legacy.challenge_name ?? 'Overcomer',
+                })
+              }
+            })
         }
       })
   }, [])
